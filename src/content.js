@@ -266,7 +266,7 @@
     // Scan first, while the original grid is still on screen.
     const scanned = scanWatchedFromGrid(channel);
     const gridItemsOnPage = contents.querySelectorAll("ytd-rich-item-renderer, ytd-grid-video-renderer").length;
-    console.log("[YTCH 0.2.2] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
+    console.log("[YTCH 0.2.3] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
     state.savedChip = sortChipButtons().find(function (b) { return b.getAttribute("aria-selected") === "true"; }) || null;
     state.active = true;
     state.lastChannel = channel;
@@ -286,7 +286,7 @@
       const stored = filterByChannel((res && res.watches) || [], channel);
       const watches = mergeWatches(stored, scanned);
       state.lastWatches = watches;
-      console.log("[YTCH 0.2.2] stored for channel:", stored.length, "merged:", watches.length);
+      console.log("[YTCH 0.2.3] stored for channel:", stored.length, "merged:", watches.length);
       if (scanned.length) {
         chrome.runtime.sendMessage({ type: "ytch-import-watches", watches: scanned }).catch(function () {});
       }
@@ -296,7 +296,7 @@
         hideOriginalGrid();
       }
     } catch (e) {
-      console.log("[YTCH 0.2.2] stored load failed, showing scanned only:", e);
+      console.log("[YTCH 0.2.3] stored load failed, showing scanned only:", e);
       state.lastWatches = scanned;
       if (state.active) {
         historyGrid = ensureHistoryGrid();
@@ -306,9 +306,62 @@
     }
   }
 
+  function bindSortChips() {
+    // Capture listeners on the real sort chips: run before YouTube's own
+    // handlers, so the original grid is restored first, then YouTube
+    // loads its own sort in place. Bind on every inject, not just the
+    // first, because the chip bar may appear later than the History
+    // button, and a chip without a listener will not restore the grid.
+    sortChipButtons().forEach(function (b) {
+      if (b.dataset.ytchBound) return;
+      b.dataset.ytchBound = "1";
+      b.addEventListener("click", function () { closeHistory(false); }, true);
+    });
+  }
+
+  function wrapHistoryButton(button) {
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("role", "presentation");
+    wrapper.className = "ytChipBarViewModelChipWrapper";
+    const viewModel = document.createElement("chip-view-model");
+    viewModel.className = "ytChipViewModelHost";
+    viewModel.setAttribute("role", "presentation");
+    const shape = document.createElement("chip-shape");
+    shape.className = "ytChipShapeHost";
+    shape.setAttribute("role", "presentation");
+    shape.appendChild(button);
+    viewModel.appendChild(shape);
+    wrapper.appendChild(viewModel);
+    return wrapper;
+  }
+
   function inject() {
     if (!isChannelVideosPage()) return;
-    if (document.getElementById("ytch-history-button")) return;
+    const channel = getChannelFromPage();
+    const chipBar = findChipBar();
+    const existing = document.getElementById("ytch-history-button");
+    // Codex, real Chrome, 0.2.2: the History button was created in a
+    // body fallback row, behind the masthead, because the chip bar was
+    // not ready when the script first ran, and inject() then returned
+    // early forever because the button existed. Never do that again:
+    // if a native chip bar is now available and the button is not in
+    // it, move the button into the chip bar. Always bind sort chips
+    // on every run, so Latest restores the grid even if the chip bar
+    // appeared after the History button.
+    if (existing) {
+      bindSortChips();
+      if (chipBar && !chipBar.contains(existing)) {
+        const oldParent = existing.parentElement;
+        const wrapper = wrapHistoryButton(existing);
+        chipBar.appendChild(wrapper);
+        if (oldParent && oldParent.parentElement && oldParent.parentElement.className === "ytch-chip-row" && !oldParent.parentElement.querySelector("button")) oldParent.parentElement.remove();
+        else if (oldParent && oldParent.className === "ytch-chip-row") oldParent.remove();
+        const fallback = document.getElementById("ytch-fallback-row");
+        if (fallback && !fallback.querySelector("button")) fallback.remove();
+      }
+      if (state.active) { setChip(existing, true); hideOriginalGrid(); }
+      return;
+    }
     // The chip is missing, which means YouTube re-rendered the chip
     // bar. If History is supposed to be on, keep it on: do NOT remove
     // the History grid, re-create the chip and re-activate it, and
@@ -325,17 +378,7 @@
       state.savedChip = null;
       state.lastWatches = [];
     }
-    const channel = getChannelFromPage();
-    const chipBar = findChipBar();
-
-    // Capture listeners on the real sort chips: run before YouTube's own
-    // handlers, so the original grid is restored first, then YouTube
-    // loads its own sort in place.
-    sortChipButtons().forEach(function (b) {
-      if (b.dataset.ytchBound) return;
-      b.dataset.ytchBound = "1";
-      b.addEventListener("click", function () { closeHistory(false); }, true);
-    });
+    bindSortChips();
 
     function makeHistoryButton() {
       const button = document.createElement("button");
@@ -360,29 +403,21 @@
     }
 
     if (chipBar) {
-      const wrapper = document.createElement("div");
-      wrapper.setAttribute("role", "presentation");
-      wrapper.className = "ytChipBarViewModelChipWrapper";
-      const viewModel = document.createElement("chip-view-model");
-      viewModel.className = "ytChipViewModelHost";
-      viewModel.setAttribute("role", "presentation");
-      const shape = document.createElement("chip-shape");
-      shape.className = "ytChipShapeHost";
-      shape.setAttribute("role", "presentation");
       const button = makeHistoryButton();
-      shape.appendChild(button);
-      viewModel.appendChild(shape);
-      wrapper.appendChild(viewModel);
-      chipBar.appendChild(wrapper);
+      chipBar.appendChild(wrapHistoryButton(button));
       if (state.active) { setChip(button, true); hideOriginalGrid(); }
       return;
     }
 
-    // Fallback, when no YouTube chip bar is found: build our own chip
-    // row, left aligned, directly above the grid, instead of dropping
-    // a lone button in front of the grid, which ended up on a second
-    // row, right aligned, on some channel layouts.
+    // No chip bar yet: do NOT create a body fallback row. Codex found
+    // that row at the top of the body, behind the masthead, and it was
+    // never moved. Wait for the chip bar, the 1 second watchdog will
+    // call inject() again. Only use a fallback row when the grid
+    // itself exists, so the row sits above the grid, not on the body.
+    const grid = findContents();
+    if (!grid || !grid.parentElement) return;
     const row = document.createElement("div");
+    row.id = "ytch-fallback-row";
     row.className = "ytch-chip-row";
     row.style.display = "flex";
     row.style.gap = "8px";
@@ -392,9 +427,7 @@
     wrapper.setAttribute("role", "presentation");
     wrapper.appendChild(makeHistoryButton());
     row.appendChild(wrapper);
-    const grid = findContents();
-    if (grid && grid.parentElement) grid.parentElement.insertBefore(row, grid);
-    else document.body.prepend(row);
+    grid.parentElement.insertBefore(row, grid);
   }
 
   function recordWatchIfNeeded() {
@@ -458,7 +491,7 @@
         setTimeout(function () {
           pending = false;
           if (state.active) watchdog();
-          if (isChannelVideosPage() && !document.getElementById("ytch-history-button")) run();
+          if (isChannelVideosPage()) run();
         }, 200);
       });
       window.__ytchObserver.observe(document.documentElement, { childList: true, subtree: true });
@@ -467,7 +500,7 @@
     setInterval(function () {
       if (window.location.href !== lastUrl) { lastUrl = window.location.href; setTimeout(run, 500); return; }
       if (state.active) watchdog();
-      if (isChannelVideosPage() && !document.getElementById("ytch-history-button")) run();
+      if (isChannelVideosPage()) run();
     }, 1000);
   }
 
