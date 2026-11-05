@@ -35,7 +35,12 @@
   }
 
   function buttonByText(text) {
-    const buttons = Array.from(document.querySelectorAll("button"));
+    // Only search buttons in or near the grid header, not the whole
+    // document. A whole-document search returns the first "Latest" or
+    // "Public" button anywhere, which is often a sidebar, menu, or
+    // header button, not the chip bar.
+    const scope = document.querySelector("ytd-rich-grid-renderer") || document.body;
+    const buttons = Array.from(scope.querySelectorAll("button"));
     return buttons.find(function (b) {
       const t = (b.textContent || "").trim().replace(/\s+/g, " ");
       return t === text || t.indexOf(text + " ") === 0 || t === text + " ∨" || t === text + " ▾";
@@ -85,8 +90,24 @@
     // #contents is the grid items container, inside the grid renderer
     // and below the chip bar header. Never replace the renderer itself,
     // or the chip bar would be replaced with the grid.
-    return document.querySelector('ytd-rich-grid-renderer #contents') ||
-      document.querySelector('#contents');
+    // Do NOT fall back to the first #contents in the document: YouTube
+    // has many #contents elements, and the first one is usually not
+    // the video grid. Only return a #contents that actually holds
+    // grid items, or a shadow-root #contents on a grid renderer.
+    const renderers = Array.from(document.querySelectorAll("ytd-rich-grid-renderer"));
+    for (let i = 0; i < renderers.length; i++) {
+      const c = renderers[i].querySelector("#contents") || (renderers[i].shadowRoot ? renderers[i].shadowRoot.querySelector("#contents") : null);
+      if (c && c.querySelector("ytd-rich-item-renderer, ytd-grid-video-renderer")) return c;
+    }
+    for (let i = 0; i < renderers.length; i++) {
+      const c = renderers[i].querySelector("#contents") || (renderers[i].shadowRoot ? renderers[i].shadowRoot.querySelector("#contents") : null);
+      if (c) return c;
+    }
+    const all = Array.from(document.querySelectorAll("#contents"));
+    for (let i = 0; i < all.length; i++) {
+      if (all[i].querySelector("ytd-rich-item-renderer, ytd-grid-video-renderer")) return all[i];
+    }
+    return null;
   }
 
   function sortChipButtons() {
@@ -176,24 +197,35 @@
     if (grid) return grid;
     grid = document.createElement("div");
     grid.id = "ytch-history-grid";
-    const renderer = findRenderer();
-    if (renderer && renderer.parentElement) renderer.parentElement.insertBefore(grid, renderer.nextSibling);
-    else {
-      const contents = findContents();
-      if (contents && contents.parentElement) contents.parentElement.insertBefore(grid, contents.nextSibling);
-      else document.body.appendChild(grid);
-    }
+    // History grid MUST live inside #contents, not outside the
+    // renderer. YouTube's custom elements only render slotted
+    // children, so a div inserted after ytd-rich-grid-renderer, into
+    // its parent custom element, is invisible on a real page, even
+    // though it renders in a plain mock. #contents children are
+    // rendered, because the grid items live there.
+    const contents = findContents();
+    if (contents) contents.appendChild(grid);
+    else document.body.appendChild(grid);
     return grid;
   }
 
   function hideOriginalGrid() {
     const contents = findContents();
-    if (contents) contents.style.display = "none";
+    if (!contents) return;
+    // Hide each original item, do not hide #contents itself, because
+    // the History grid lives inside #contents and would be hidden too.
+    Array.from(contents.querySelectorAll("ytd-rich-item-renderer, ytd-grid-video-renderer")).forEach(function (item) {
+      item.dataset.ytchHidden = "1";
+      item.style.display = "none";
+    });
   }
 
   function showOriginalGrid() {
     const contents = findContents();
-    if (contents) contents.style.display = "";
+    if (!contents) return;
+    Array.from(contents.querySelectorAll("ytd-rich-item-renderer, ytd-grid-video-renderer")).forEach(function (item) {
+      if (item.dataset.ytchHidden) { delete item.dataset.ytchHidden; item.style.display = ""; }
+    });
   }
 
   function closeHistory(restoreSelected) {
@@ -218,8 +250,7 @@
     // and re-activate the chip. This is the fix for the screenshot
     // where the chip was black but the grid was the original grid.
     if (!state.active) return;
-    const contents = findContents();
-    if (contents && contents.style.display !== "none") contents.style.display = "none";
+    hideOriginalGrid();
     let grid = historyGridEl();
     if (!grid) {
       grid = ensureHistoryGrid();
@@ -235,7 +266,7 @@
     // Scan first, while the original grid is still on screen.
     const scanned = scanWatchedFromGrid(channel);
     const gridItemsOnPage = contents.querySelectorAll("ytd-rich-item-renderer, ytd-grid-video-renderer").length;
-    console.log("[YTCH 0.2.1] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
+    console.log("[YTCH 0.2.2] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
     state.savedChip = sortChipButtons().find(function (b) { return b.getAttribute("aria-selected") === "true"; }) || null;
     state.active = true;
     state.lastChannel = channel;
@@ -255,7 +286,7 @@
       const stored = filterByChannel((res && res.watches) || [], channel);
       const watches = mergeWatches(stored, scanned);
       state.lastWatches = watches;
-      console.log("[YTCH 0.2.1] stored for channel:", stored.length, "merged:", watches.length);
+      console.log("[YTCH 0.2.2] stored for channel:", stored.length, "merged:", watches.length);
       if (scanned.length) {
         chrome.runtime.sendMessage({ type: "ytch-import-watches", watches: scanned }).catch(function () {});
       }
@@ -265,7 +296,7 @@
         hideOriginalGrid();
       }
     } catch (e) {
-      console.log("[YTCH 0.2.1] stored load failed, showing scanned only:", e);
+      console.log("[YTCH 0.2.2] stored load failed, showing scanned only:", e);
       state.lastWatches = scanned;
       if (state.active) {
         historyGrid = ensureHistoryGrid();
@@ -404,11 +435,11 @@
       state.lastUrl = window.location.href;
       const oldGrid = historyGridEl();
       if (oldGrid) oldGrid.remove();
-      const oldContents = findContents();
-      if (oldContents) oldContents.style.display = "";
+      showOriginalGrid();
       state.active = false;
       state.savedContents = null;
       state.savedChip = null;
+      state.lastWatches = [];
     }
     inject();
     recordWatchIfNeeded();
