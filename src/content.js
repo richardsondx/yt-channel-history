@@ -32,13 +32,50 @@
     return window.location.pathname === "/watch" && !!parseVideoId(window.location.href);
   }
 
+  function buttonByText(text) {
+    const buttons = Array.from(document.querySelectorAll("button"));
+    return buttons.find(function (b) {
+      const t = (b.textContent || "").trim().replace(/\s+/g, " ");
+      return t === text || t.indexOf(text + " ") === 0 || t === text + " ∨" || t === text + " ▾";
+    }) || null;
+  }
+
+  function containerForChipButton(button) {
+    if (!button) return null;
+    const tablist = button.closest('[role="tablist"]');
+    if (tablist) return tablist;
+    const chipBar = button.closest("chip-bar-view-model");
+    if (chipBar) return chipBar;
+    // Walk up to the first ancestor that holds at least two chip-like
+    // buttons, so a filter row like Latest, Members only, Public is
+    // found even when it is not a tablist.
+    let el = button.parentElement;
+    for (let i = 0; i < 4 && el; i++) {
+      const buttons = el.querySelectorAll("button");
+      if (buttons.length >= 2) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
   function findChipBar() {
     // Real YouTube markup, from a channel Videos page: a button with
     // aria-label="Latest" inside a [role="tablist"] chip bar. The tablist,
     // not the first chip's wrapper, is the container to append to.
     // Appending to the wrapper is what put History on a second row.
     const latest = document.querySelector('button[aria-label="Latest"]');
-    if (latest) return latest.closest('[role="tablist"]');
+    if (latest) {
+      const tablist = latest.closest('[role="tablist"]');
+      if (tablist) return tablist;
+    }
+    // Members only layout: Latest is a dropdown, not a tab, and the
+    // chip row is Latest, Members only, Public. Find that row by text,
+    // not by aria-label and not by tablist.
+    const byText = buttonByText("Latest") || buttonByText("Members only") || buttonByText("Public") || buttonByText("Popular") || buttonByText("Oldest");
+    const container = containerForChipButton(byText);
+    if (container) return container;
+    const anyTablist = document.querySelector('[role="tablist"]');
+    if (anyTablist) return anyTablist;
     return null;
   }
 
@@ -51,7 +88,10 @@
   }
 
   function sortChipButtons() {
-    return Array.from(document.querySelectorAll('button[aria-label="Latest"], button[aria-label="Popular"], button[aria-label="Oldest"]'));
+    const byAria = Array.from(document.querySelectorAll('button[aria-label="Latest"], button[aria-label="Popular"], button[aria-label="Oldest"]'));
+    const byText = ["Latest", "Members only", "Public", "Popular", "Oldest"].map(function (t) { return buttonByText(t); }).filter(Boolean);
+    const all = byAria.concat(byText);
+    return Array.from(new Set(all));
   }
 
   function setChip(button, active) {
@@ -77,20 +117,39 @@
     const items = contents.querySelectorAll("ytd-rich-item-renderer, ytd-grid-video-renderer");
     const watched = [];
     items.forEach(function (item) {
-      const progress = item.querySelector("ytd-thumbnail-overlay-resume-playback-renderer, #progress, [id='progress']");
-      const hasProgress = !!progress || /resume-playback/i.test(item.innerHTML || "");
+      // Old markup: ytd-thumbnail-overlay-resume-playback-renderer.
+      // New markup, from a real channel page: a
+      // yt-thumbnail-overlay-progress-bar-view-model with a
+      // WatchedProgressBarSegment, width 100% for a fully watched
+      // video and 10% for a partly watched one. A segment at 0% is
+      // not a watch, so check its width when it is given.
+      const segment = item.querySelector(".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment");
+      let hasProgress = false;
+      if (segment) {
+        const widthText = segment.style && segment.style.width ? segment.style.width : "";
+        const width = parseFloat(widthText);
+        hasProgress = !widthText || isNaN(width) || width > 0;
+      } else {
+        const progress = item.querySelector("ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, #progress, [id='progress']");
+        hasProgress = !!progress || /resume-playback|WatchedProgressBar|progress-bar/i.test(item.innerHTML || "");
+      }
       if (!hasProgress) return;
-      const link = item.querySelector('a#thumbnail, a[href*="/watch?v="]');
-      if (!link) return;
-      const videoId = parseVideoId(link.getAttribute("href") || "");
-      if (!videoId) return;
-      const titleEl = item.querySelector("#video-title, h3 a, #video-title-link");
+      const links = Array.from(item.querySelectorAll('a#thumbnail, a.ytLockupViewModelContentImage, a[href*="/watch?v="]'));
+      let link = null;
+      let videoId = null;
+      for (let i = 0; i < links.length; i++) {
+        const id = parseVideoId(links[i].getAttribute("href") || "");
+        if (id) { link = links[i]; videoId = id; break; }
+      }
+      if (!link || !videoId) return;
+      const titleEl = item.querySelector("#video-title, h3 a, .ytLockupMetadataViewModelTitle, #video-title-link");
+      const titleText = titleEl ? titleEl.textContent.trim() : (item.querySelector("h3") ? item.querySelector("h3").getAttribute("title") || "" : "");
       const img = item.querySelector("img");
       watched.push({
         videoId: videoId,
-        title: titleEl ? titleEl.textContent.trim() : videoId,
+        title: titleText || videoId,
         url: "https://www.youtube.com/watch?v=" + videoId,
-        thumbnail: img ? (img.getAttribute("src") || "") : ("https://i.ytimg.com/vi/" + videoId + "/mqdefault.jpg"),
+        thumbnail: img ? (img.getAttribute("src") || img.currentSrc || "") : ("https://i.ytimg.com/vi/" + videoId + "/mqdefault.jpg"),
         channelName: null,
         channelHandle: channel.handle || null,
         channelId: channel.channelId || null,
@@ -164,16 +223,7 @@
       b.addEventListener("click", function () { closeHistory(false); }, true);
     });
 
-    if (chipBar) {
-      const wrapper = document.createElement("div");
-      wrapper.setAttribute("role", "presentation");
-      wrapper.className = "ytChipBarViewModelChipWrapper";
-      const viewModel = document.createElement("chip-view-model");
-      viewModel.className = "ytChipViewModelHost";
-      viewModel.setAttribute("role", "presentation");
-      const shape = document.createElement("chip-shape");
-      shape.className = "ytChipShapeHost";
-      shape.setAttribute("role", "presentation");
+    function makeHistoryButton() {
       const button = document.createElement("button");
       button.id = "ytch-history-button";
       button.type = "button";
@@ -188,28 +238,48 @@
       text.textContent = "History";
       chip.appendChild(text);
       button.appendChild(chip);
-      shape.appendChild(button);
-      viewModel.appendChild(shape);
-      wrapper.appendChild(viewModel);
-      chipBar.appendChild(wrapper);
       button.addEventListener("click", function () {
         if (state.active) { closeHistory(true); return; }
         openHistory(channel);
       });
+      return button;
+    }
+
+    if (chipBar) {
+      const wrapper = document.createElement("div");
+      wrapper.setAttribute("role", "presentation");
+      wrapper.className = "ytChipBarViewModelChipWrapper";
+      const viewModel = document.createElement("chip-view-model");
+      viewModel.className = "ytChipViewModelHost";
+      viewModel.setAttribute("role", "presentation");
+      const shape = document.createElement("chip-shape");
+      shape.className = "ytChipShapeHost";
+      shape.setAttribute("role", "presentation");
+      const button = makeHistoryButton();
+      shape.appendChild(button);
+      viewModel.appendChild(shape);
+      wrapper.appendChild(viewModel);
+      chipBar.appendChild(wrapper);
       return;
     }
 
-    // Fallback, when no YouTube chip bar is found.
-    const button = document.createElement("button");
-    button.id = "ytch-history-button";
-    button.type = "button";
-    button.textContent = "History";
-    button.addEventListener("click", function () {
-      if (state.active) { closeHistory(true); return; }
-      openHistory(channel);
-    });
+    // Fallback, when no YouTube chip bar is found: build our own chip
+    // row, left aligned, directly above the grid, instead of dropping
+    // a lone button in front of the grid, which ended up on a second
+    // row, right aligned, on some channel layouts.
+    const row = document.createElement("div");
+    row.className = "ytch-chip-row";
+    row.style.display = "flex";
+    row.style.gap = "8px";
+    row.style.alignItems = "center";
+    row.style.margin = "12px 0";
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("role", "presentation");
+    wrapper.appendChild(makeHistoryButton());
+    row.appendChild(wrapper);
     const grid = findContents();
-    if (grid && grid.parentElement) grid.parentElement.insertBefore(button, grid);
+    if (grid && grid.parentElement) grid.parentElement.insertBefore(row, grid);
+    else document.body.prepend(row);
   }
 
   function recordWatchIfNeeded() {
