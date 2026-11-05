@@ -70,9 +70,30 @@ function dedupeWatches(watches) {
   (watches || []).forEach(function (w) {
     if (!w || !w.videoId) return;
     const existing = byId.get(w.videoId);
-    if (!existing || (w.watchedAt || 0) > (existing.watchedAt || 0)) byId.set(w.videoId, w);
+    if (!existing) { byId.set(w.videoId, w); return; }
+    // Prefer a record that actually knows its channel, and a newer date,
+    // so a repair lookup can fill in a channel that was missing before.
+    const existingHasChannel = !!(existing.channelHandle || existing.channelId || existing.channelUrl);
+    const nextHasChannel = !!(w.channelHandle || w.channelId || w.channelUrl);
+    if (nextHasChannel && !existingHasChannel) { byId.set(w.videoId, w); return; }
+    if (!nextHasChannel && existingHasChannel) return;
+    if ((w.watchedAt || 0) > (existing.watchedAt || 0)) byId.set(w.videoId, w);
   });
   return Array.from(byId.values());
+}
+
+function mergeWatches(base, extra) {
+  // Keep the stored record when both know the same video, unless the
+  // extra record adds a channel or a newer watched date. Dedupe handles
+  // the channel preference, but a stored watched date must win over a
+  // progress scan that has no date at all.
+  const merged = dedupeWatches((base || []).concat(extra || []));
+  return merged.map(function (w) {
+    const stored = (base || []).find(function (b) { return b && b.videoId === w.videoId; });
+    if (stored && stored.watchedAt && !w.watchedAt) return Object.assign({}, w, { watchedAt: stored.watchedAt });
+    if (stored && !stored.watchedAt && w.watchedAt) return Object.assign({}, stored, { watchedAt: w.watchedAt });
+    return w;
+  });
 }
 
 function sortWatchesDesc(watches) {
@@ -119,10 +140,11 @@ function renderWatchGridHtml(watches) {
   }
   const items = list.map(function (w) {
     const thumb = w.thumbnail || ("https://i.ytimg.com/vi/" + w.videoId + "/mqdefault.jpg");
+    const meta = w.watchedAt ? ("Watched " + formatWatchedDate(w.watchedAt)) : "Watched";
     return '<a class="ytch-grid-item" href="' + escapeHtml(w.url || ("https://www.youtube.com/watch?v=" + w.videoId)) + '">' +
       '<img class="ytch-grid-thumb" src="' + escapeHtml(thumb) + '" alt="" loading="lazy">' +
       '<span class="ytch-grid-title">' + escapeHtml(w.title || w.videoId) + '</span>' +
-      '<span class="ytch-grid-meta">Watched ' + escapeHtml(formatWatchedDate(w.watchedAt)) + '</span></a>';
+      '<span class="ytch-grid-meta">' + escapeHtml(meta) + '</span></a>';
   }).join("");
   return '<div class="ytch-grid">' + items + '</div>';
 }
@@ -137,6 +159,7 @@ if (typeof module !== "undefined" && module.exports) {
     watchMatchesChannel: watchMatchesChannel,
     filterByChannel: filterByChannel,
     dedupeWatches: dedupeWatches,
+    mergeWatches: mergeWatches,
     sortWatchesDesc: sortWatchesDesc,
     escapeHtml: escapeHtml,
     formatWatchedDate: formatWatchedDate,

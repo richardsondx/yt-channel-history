@@ -9,7 +9,11 @@ async function refresh() {
 document.getElementById("backfill").addEventListener("click", async function () {
   document.getElementById("status").textContent = "Backfilling...";
   const res = await chrome.runtime.sendMessage({ type: "ytch-backfill" });
-  document.getElementById("status").textContent = res && res.ok ? "Backfill done." : "Backfill failed.";
+  if (res && res.ok && res.result) {
+    document.getElementById("status").textContent = "Backfill done: " + res.result.added + " checked, " + res.result.total + " stored.";
+  } else {
+    document.getElementById("status").textContent = "Backfill failed.";
+  }
   refresh();
 });
 document.getElementById("clear").addEventListener("click", async function () {

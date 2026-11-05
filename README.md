@@ -24,12 +24,15 @@ No Chrome Web Store listing is included in this repo. Loading unpacked is the in
 
 ## How it works
 
-Two sources, both stored in your browser with `chrome.storage.local`:
+Three sources, all stored in your browser with `chrome.storage.local`:
 
+- Channel grid, the most complete source on the page itself: when you click History, the extension first scans the channel grid already on screen for videos YouTube marks as watched, with the red progress bar on the thumbnail. That list is synced to your signed-in YouTube account, so it includes videos you watched on another device, and it needs no browser history and no lookup. Scroll the channel page to load more videos, then open History again, and newly loaded watched videos are added to the stored list.
 - Track forward: when a YouTube video page loads, the extension records the video, its title, and the channel from that page.
-- Backfill: the popup has a Run backfill button. It reads your browser history for `youtube.com/watch` pages, up to 1000 items, and looks up the channel for each video with the public YouTube oEmbed endpoint, which needs no key and no sign-in. Backfill runs in batches of 200 channel lookups. Run it again if you want older videos, since each run picks up videos not yet stored.
+- Backfill: the popup has a Run backfill button. It reads your browser history for `youtube.com/watch` pages, up to 1000 items, and looks up the channel for each video with the public YouTube oEmbed endpoint, which needs no key and no sign-in. Backfill runs in batches of 200, up to 1000 lookups per run, and it also re-checks videos already stored without a channel, so a failed lookup is not stuck forever.
 
 A watch is recorded when a video page loads. It is not measured by how long you watched. That is a known limit, and a watch-time threshold is a possible next step, not part of this version.
+
+If you click Latest, Popular, or Oldest, YouTube replaces the chip bar, which used to delete the History chip until you refreshed the page. The extension now watches for that replacement and puts History back in the new chip bar, without a refresh.
 
 ## Privacy
 
@@ -47,7 +50,7 @@ Permissions, and why each is needed:
 
 ## Limits, stated plainly
 
-- Backfill is capped, not literally every video ever watched. Browser history retention, the 1000 item search cap, and the 200 lookup batch per run all bound it. Videos whose channel lookup fails are kept without channel info, and will not show on a channel page until a later forward watch of the same video fills the channel in.
+- Backfill is capped, not literally every video ever watched. Browser history retention and the 1000 item search cap bound it. Videos whose channel lookup fails are kept without channel info, and a later backfill re-checks them, so they are not stuck without a channel forever. For a complete list on a channel you are looking at, the channel grid scan above is the better source, because it uses YouTube's own watched markers, not your local browser history.
 - YouTube can change its page layout. The extension looks for the Latest, Popular, and Oldest chips in their chip bar, adds History as a chip in that same bar, and replaces the grid items container below it. If those chips are not found, it falls back to placing a History button above the video grid. Placement on a live, real YouTube channel page has not yet been verified in the sandbox used to build this, because that sandbox blocks youtube.com. Loading it unpacked on a real browser and checking a real channel page is the next verification step, and is not claimed here.
 - Shorts, embeds, and live pages are parsed for a video id where possible, but the main path tested is a standard watch page and a channel Videos page.
 

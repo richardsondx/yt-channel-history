@@ -51,4 +51,17 @@ assert.ok(grid.includes("Watched") && !grid.includes("Other one"));
 assert.ok(!lib.renderWatchGridHtml(filtered).includes("<script>alert"));
 assert.ok(lib.renderWatchGridHtml([]).includes("No watched videos"));
 
+// Repair: a later record with a channel fills in an earlier record without one,
+// and a progress scan with no date does not overwrite a stored watched date.
+const noChannel = { videoId: "zzz", title: "No channel yet", channelHandle: null, watchedAt: 1000 };
+const withChannel = { videoId: "zzz", title: "No channel yet", channelHandle: "DemoChannel", watchedAt: 1000 };
+assert.strictEqual(lib.dedupeWatches([noChannel, withChannel])[0].channelHandle, "DemoChannel");
+const merged = lib.mergeWatches(
+  [{ videoId: "scan1", title: "Scanned", channelHandle: "DemoChannel", watchedAt: 5000 }],
+  [{ videoId: "scan1", title: "Scanned", channelHandle: "DemoChannel", watchedAt: null }]
+);
+assert.strictEqual(merged[0].watchedAt, 5000);
+const gridNoDate = lib.renderWatchGridHtml([{ videoId: "scan1", title: "Scanned", channelHandle: "DemoChannel", watchedAt: null }]);
+assert.ok(gridNoDate.includes("Watched") && !gridNoDate.includes("Watched Invalid"));
+
 console.log("All tests passed: parsing, channel match, filter, dedupe, sort, rendering, grid rendering, escaping.");

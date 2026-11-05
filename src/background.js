@@ -4,7 +4,8 @@ importScripts("shared.js");
 // used only to learn the channel name for a video id already in history.
 // oEmbed needs no key and no sign-in.
 
-const MAX_BACKFILL_OEMBED = 200;
+const MAX_BACKFILL_OEMBED = 1000;
+const BACKFILL_BATCH = 200;
 
 async function getWatches() {
   const data = await chrome.storage.local.get(["watches"]);
@@ -15,9 +16,29 @@ async function saveWatches(watches) {
   await chrome.storage.local.set({ watches: watches });
 }
 
+async function resolveCandidate(candidate) {
+  try {
+    const res = await fetch("https://www.youtube.com/oembed?url=" + encodeURIComponent(candidate.url) + "&format=json");
+    if (!res.ok) return Object.assign({}, candidate, { source: "history" });
+    const info = await res.json();
+    const channel = channelFromAuthorUrl(info.author_url || "");
+    return Object.assign({}, candidate, {
+      title: info.title || candidate.title,
+      thumbnail: info.thumbnail_url || candidate.thumbnail || null,
+      channelName: info.author_name || null,
+      channelHandle: channel && channel.handle ? channel.handle : null,
+      channelId: channel && channel.channelId ? channel.channelId : null,
+      channelUrl: channel ? channel.url : null,
+      source: "history"
+    });
+  } catch (e) {
+    return Object.assign({}, candidate, { source: "history" });
+  }
+}
+
 async function backfill() {
   const existing = await getWatches();
-  const knownIds = new Set(existing.map(function (w) { return w.videoId; }));
+  const knownById = new Map(existing.map(function (w) { return [w.videoId, w]; }));
   const historyItems = await chrome.history.search({
     text: "youtube.com/watch",
     maxResults: 1000,
@@ -28,38 +49,27 @@ async function backfill() {
   historyItems.forEach(function (item) {
     if (!item || !item.url) return;
     const videoId = parseVideoId(item.url);
-    if (!videoId || seen.has(videoId) || knownIds.has(videoId)) return;
+    if (!videoId || seen.has(videoId)) return;
     seen.add(videoId);
-    candidates.push({ videoId: videoId, title: item.title || videoId, url: "https://www.youtube.com/watch?v=" + videoId, watchedAt: item.lastVisitTime || Date.now() });
+    const known = knownById.get(videoId);
+    // The old bug: a video already stored without a channel was skipped
+    // forever, so backfill could never fill its channel in. Re-resolve
+    // those, and resolve new videos too, in batches up to 1000.
+    if (known && known.channelHandle) return;
+    if (known && known.channelId) return;
+    candidates.push({ videoId: videoId, title: (known && known.title) || item.title || videoId, url: "https://www.youtube.com/watch?v=" + videoId, watchedAt: (known && known.watchedAt) || item.lastVisitTime || Date.now(), thumbnail: known && known.thumbnail ? known.thumbnail : null });
   });
 
   const resolved = [];
-  for (const candidate of candidates.slice(0, MAX_BACKFILL_OEMBED)) {
-    try {
-      const res = await fetch("https://www.youtube.com/oembed?url=" + encodeURIComponent(candidate.url) + "&format=json");
-      if (!res.ok) continue;
-      const info = await res.json();
-      const channel = channelFromAuthorUrl(info.author_url || "");
-      resolved.push(Object.assign({}, candidate, {
-        title: info.title || candidate.title,
-        thumbnail: info.thumbnail_url || candidate.thumbnail || null,
-        channelName: info.author_name || null,
-        channelHandle: channel && channel.handle ? channel.handle : null,
-        channelId: channel && channel.channelId ? channel.channelId : null,
-        channelUrl: channel ? channel.url : null,
-        source: "history"
-      }));
-    } catch (e) {
-      // Keep the video without channel info rather than dropping it.
-      // It will not show on a channel page until its channel is known,
-      // but a later forward watch of the same video will fill it in.
-      resolved.push(Object.assign({}, candidate, { source: "history" }));
-    }
+  const limited = candidates.slice(0, MAX_BACKFILL_OEMBED);
+  for (let i = 0; i < limited.length; i += BACKFILL_BATCH) {
+    const batch = limited.slice(i, i + BACKFILL_BATCH);
+    for (const candidate of batch) resolved.push(await resolveCandidate(candidate));
   }
-  const merged = dedupeWatches(existing.concat(resolved));
+  const merged = mergeWatches(existing, resolved);
   await saveWatches(merged);
   await chrome.storage.local.set({ backfilledAt: Date.now() });
-  return { added: resolved.length, total: merged.length };
+  return { added: resolved.length, repaired: resolved.filter(function (w) { return knownById.has(w.videoId); }).length, total: merged.length };
 }
 
 chrome.runtime.onInstalled.addListener(function () {
@@ -81,6 +91,13 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
       const merged = dedupeWatches(watches.concat([Object.assign({}, watch, { source: "watch" })]));
       return saveWatches(merged).then(function () { sendResponse({ ok: true }); });
     });
+    return true;
+  }
+  if (message.type === "ytch-import-watches") {
+    const watches = Array.isArray(message.watches) ? message.watches : [];
+    getWatches().then(function (existing) {
+      return saveWatches(mergeWatches(existing, watches)).then(function () { sendResponse({ ok: true }); });
+    }).catch(function () { sendResponse({ ok: false }); });
     return true;
   }
   if (message.type === "ytch-backfill") {
