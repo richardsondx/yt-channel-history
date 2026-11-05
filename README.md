@@ -34,6 +34,8 @@ A watch is recorded when a video page loads. It is not measured by how long you 
 
 If you click Latest, Popular, or Oldest, YouTube replaces the chip bar, which used to delete the History chip until you refreshed the page. The extension now watches for that replacement and puts History back in the new chip bar, without a refresh. On channels with a Members only filter, Latest is a dropdown, not a tab, so History is placed in that Latest, Members only, Public chip row, in the same row, not on a second row.
 
+Version 0.2.0 changes how History is shown: it no longer replaces YouTube's managed grid contents, which YouTube can re-render and wipe. It hides the original grid and puts the History grid next to it, as a sibling, then shows the original grid again when you leave History. When you click History, it also logs to the browser console, with the tag [YTCH 0.2.0], how many grid items were on the page, how many were scanned as watched, and how many were stored for that channel. If History is still empty on a real page, that log is the first thing to check.
+
 ## Privacy
 
 Your watched list stays in your browser. There is no account, no server, and no analytics in this extension.

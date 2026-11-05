@@ -1,1 +1,44 @@
-{"action":{"default_icon":{"128":"icons/icon128.png","16":"icons/icon16.png","48":"icons/icon48.png"},"default_popup":"src/popup.html"},"background":{"service_worker":"src/background.js"},"content_scripts":[{"css":["src/content.css"],"js":["src/shared.js","src/content.js"],"matches":["*://*.youtube.com/*"],"run_at":"document_idle"}],"description":"History view for a YouTube channel. List stays in your browser, except a public lookup for backfill channel names.","host_permissions":["*://*.youtube.com/*"],"icons":{"128":"icons/icon128.png","16":"icons/icon16.png","48":"icons/icon48.png"},"manifest_version":3,"name":"YouTube Channel History","permissions":["storage","history"],"version":"0.1.0"}
+{
+  "action": {
+    "default_icon": {
+      "128": "icons/icon128.png",
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    },
+    "default_popup": "src/popup.html"
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "css": [
+        "src/content.css"
+      ],
+      "js": [
+        "src/shared.js",
+        "src/content.js"
+      ],
+      "matches": [
+        "*://*.youtube.com/*"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "description": "History view for a YouTube channel. List stays in your browser, except a public lookup for backfill channel names.",
+  "host_permissions": [
+    "*://*.youtube.com/*"
+  ],
+  "icons": {
+    "128": "icons/icon128.png",
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png"
+  },
+  "manifest_version": 3,
+  "name": "YouTube Channel History",
+  "permissions": [
+    "storage",
+    "history"
+  ],
+  "version": "0.2.0"
+}

@@ -161,10 +161,16 @@
     return watched;
   }
 
+  function historyGridEl() {
+    return document.getElementById("ytch-history-grid");
+  }
+
   function closeHistory(restoreSelected) {
-    if (!state.active) return;
+    if (!state.active && !historyGridEl()) return;
+    const grid = historyGridEl();
+    if (grid) grid.remove();
     const contents = findContents();
-    if (contents && state.savedContents !== null) contents.innerHTML = state.savedContents;
+    if (contents) contents.style.display = "";
     const btn = document.getElementById("ytch-history-button");
     setChip(btn, false);
     if (restoreSelected) setChip(state.savedChip, true);
@@ -178,25 +184,40 @@
     if (!contents) return;
     // Scan first, while the original grid is still on screen.
     const scanned = scanWatchedFromGrid(channel);
-    state.savedContents = contents.innerHTML;
+    const gridItemsOnPage = contents.querySelectorAll("ytd-rich-item-renderer, ytd-grid-video-renderer").length;
+    console.log("[YTCH 0.2.0] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
     state.savedChip = sortChipButtons().find(function (b) { return b.getAttribute("aria-selected") === "true"; }) || null;
     state.active = true;
     const btn = document.getElementById("ytch-history-button");
     setChip(btn, true);
     sortChipButtons().forEach(function (b) { setChip(b, false); });
-    contents.innerHTML = '<div class="ytch-grid-loading">Loading watched videos...</div>';
+    // Do NOT replace YouTube's managed #contents innerHTML. That is
+    // fragile on a real page, because YouTube can re-render it and
+    // wipe the History grid or the chip. Hide the original grid
+    // instead, and put our History grid next to it, as a sibling.
+    contents.style.display = "none";
+    let historyGrid = historyGridEl();
+    if (!historyGrid) {
+      historyGrid = document.createElement("div");
+      historyGrid.id = "ytch-history-grid";
+      if (contents.parentElement) contents.parentElement.insertBefore(historyGrid, contents.nextSibling);
+      else contents.appendChild(historyGrid);
+    }
+    historyGrid.innerHTML = '<div class="ytch-grid-loading">Loading watched videos...</div>';
     try {
       const res = await chrome.runtime.sendMessage({ type: "ytch-get-watches", channel: channel });
       const stored = filterByChannel((res && res.watches) || [], channel);
       const watches = mergeWatches(stored, scanned);
+      console.log("[YTCH 0.2.0] stored for channel:", stored.length, "merged:", watches.length);
       if (scanned.length) {
         // Save what the grid just proved was watched, so the next
         // History open finds it even if the grid has not loaded yet.
         chrome.runtime.sendMessage({ type: "ytch-import-watches", watches: scanned }).catch(function () {});
       }
-      if (state.active) contents.innerHTML = renderWatchGridHtml(watches);
+      if (state.active) historyGrid.innerHTML = renderWatchGridHtml(watches);
     } catch (e) {
-      if (state.active) contents.innerHTML = renderWatchGridHtml(scanned);
+      console.log("[YTCH 0.2.0] stored load failed, showing scanned only:", e);
+      if (state.active) historyGrid.innerHTML = renderWatchGridHtml(scanned);
     }
   }
 
@@ -205,9 +226,13 @@
     if (document.getElementById("ytch-history-button")) return;
     // The chip is missing, which means YouTube re-rendered the chip
     // bar, for example after a Latest, Popular, or Oldest click. That
-    // re-render also replaced the grid, so any saved History grid is
-    // stale and must not be restored over the new sort. Reset first,
-    // then re-create the chip in the new chip bar.
+    // re-render also replaced the grid, so any History grid is stale.
+    // Remove it and show the original grid again, then re-create the
+    // chip in the new chip bar.
+    const oldGrid = historyGridEl();
+    if (oldGrid) oldGrid.remove();
+    const oldContents = findContents();
+    if (oldContents) oldContents.style.display = "";
     state.active = false;
     state.savedContents = null;
     state.savedChip = null;
@@ -318,6 +343,10 @@
     // saved contents must not be restored over it.
     if (window.location.href !== state.lastUrl) {
       state.lastUrl = window.location.href;
+      const oldGrid = historyGridEl();
+      if (oldGrid) oldGrid.remove();
+      const oldContents = findContents();
+      if (oldContents) oldContents.style.display = "";
       state.active = false;
       state.savedContents = null;
       state.savedChip = null;
