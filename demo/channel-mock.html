@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Demo Channel - Videos</title>
+<link rel="stylesheet" href="../src/content.css">
+<style>
+body { font-family: Roboto, Arial, sans-serif; margin: 0 auto; max-width: 1000px; padding: 24px; color: #0f0f0f; }
+.tabs { display: flex; gap: 24px; font-size: 15px; border-bottom: 1px solid #e5e5e5; padding-bottom: 8px; }
+.tabs b { border-bottom: 2px solid #0f0f0f; padding-bottom: 8px; }
+.pills { display: flex; gap: 8px; margin: 16px 0; }
+.pill { padding: 8px 14px; border-radius: 999px; background: #f2f2f2; font-size: 14px; }
+.pill.active { background: #0f0f0f; color: #fff; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card img { width: 100%; border-radius: 8px; background: #eee; }
+.note { font-size: 13px; color: #606060; margin-top: 24px; }
+</style>
+</head>
+<body>
+<h1>Demo Channel</h1>
+<div class="tabs"><span>Home</span><b>Videos</b><span>Shorts</span><span>Live</span><span>Playlists</span></div>
+<div class="pills"><span class="pill">Latest</span><span class="pill active">Popular</span><span class="pill">Oldest</span></div>
+<div id="demo-panel"></div>
+<div class="grid">
+<div class="card"><img src="thumb1.png" alt=""><p>Demo video one</p></div>
+<div class="card"><img src="thumb1.png" alt=""><p>Demo video two</p></div>
+<div class="card"><img src="thumb1.png" alt=""><p>Demo video three</p></div>
+</div>
+<p class="note">Demo page only. It uses the same panel styles and list rendering as the extension, with sample data, so the screenshot shows the real History panel design without publishing real watch history.</p>
+<script src="../src/shared.js"></script>
+<script>
+var watches = [
+  { videoId: "demo1", title: "How I built a channel history tab", url: "https://www.youtube.com/watch?v=demo1", channelHandle: "DemoChannel", watchedAt: Date.now() - 86400000, thumbnail: "thumb1.png" },
+  { videoId: "demo2", title: "The simplest feature YouTube is missing", url: "https://www.youtube.com/watch?v=demo2", channelHandle: "DemoChannel", watchedAt: Date.now() - 172800000, thumbnail: "thumb2.png" },
+  { videoId: "other1", title: "Not this channel", url: "https://www.youtube.com/watch?v=other1", channelHandle: "OtherChannel", watchedAt: Date.now(), thumbnail: "thumb1.png" }
+];
+var channel = { handle: "DemoChannel" };
+var filtered = filterByChannel(watches, channel);
+var button = document.createElement("button");
+button.id = "ytch-history-button";
+button.textContent = "History";
+document.querySelector(".pills").appendChild(button);
+button.addEventListener("click", function () {
+  var existing = document.getElementById("ytch-history-panel");
+  if (existing) { existing.remove(); return; }
+  var panel = document.createElement("div");
+  panel.id = "ytch-history-panel";
+  panel.innerHTML = '<div class="ytch-heading"><span>History on this channel</span><button class="ytch-close" type="button">Back to videos</button></div><div class="ytch-body">' + renderWatchListHtml(filtered) + '</div>';
+  document.getElementById("demo-panel").appendChild(panel);
+});
+button.click();
+</script>
+</body>
+</html>

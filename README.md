@@ -1,2 +1,78 @@
-# yt-channel-history
-Chrome extension: History view for a YouTube channel, showing videos you watched from that channel
+# YouTube Channel History
+
+A Chrome extension that adds a History view to a YouTube channel, so you can see the videos you watched from that channel, in one place.
+
+Open a channel Videos page. Next to Latest, Popular, and Oldest, you will see a History button. Click it to see that channel's watched videos, newest watched first, with a link back to each video.
+
+![History panel, demo data](screenshots/history-panel.png)
+
+![Popup](screenshots/popup.png)
+
+![Empty state, demo data](screenshots/empty-state.png)
+
+Screenshots use demo data, not real watch history. The History panel in the screenshots is the same panel code and styles as the extension, with a Back to videos button to return to the channel videos.
+
+## Install, load unpacked
+
+1. Download or clone this repo.
+2. Open Chrome, go to `chrome://extensions`.
+3. Turn on Developer mode, top right.
+4. Click Load unpacked, and pick this folder.
+5. Open a YouTube channel Videos page and click History.
+
+No Chrome Web Store listing is included in this repo. Loading unpacked is the install path for now.
+
+## How it works
+
+Two sources, both stored in your browser with `chrome.storage.local`:
+
+- Track forward: when a YouTube video page loads, the extension records the video, its title, and the channel from that page.
+- Backfill: the popup has a Run backfill button. It reads your browser history for `youtube.com/watch` pages, up to 1000 items, and looks up the channel for each video with the public YouTube oEmbed endpoint, which needs no key and no sign-in. Backfill runs in batches of 200 channel lookups. Run it again if you want older videos, since each run picks up videos not yet stored.
+
+A watch is recorded when a video page loads. It is not measured by how long you watched. That is a known limit, and a watch-time threshold is a possible next step, not part of this version.
+
+## Privacy
+
+Your watched list stays in your browser. There is no account, no server, and no analytics in this extension.
+
+The one exception is backfill: to learn a channel name for a video already in your browser history, backfill sends that video URL to the public YouTube oEmbed endpoint. No sign-in is used, and no other data is sent with it.
+
+You can clear the stored list at any time from the popup.
+
+Permissions, and why each is needed:
+
+- `storage`: store the watched list in your browser.
+- `history`: backfill from browser history, only when you run backfill, and on install.
+- Host permission for `youtube.com`: inject the History button on channel pages, and read the channel from a video page you are already viewing.
+
+## Limits, stated plainly
+
+- Backfill is capped, not literally every video ever watched. Browser history retention, the 1000 item search cap, and the 200 lookup batch per run all bound it. Videos whose channel lookup fails are kept without channel info, and will not show on a channel page until a later forward watch of the same video fills the channel in.
+- YouTube can change its page layout. The extension looks for the Latest, Popular, and Oldest chips, and falls back to placing the History button above the video grid if those chips are not found. Placement on a live, real YouTube channel page has not yet been verified in the sandbox used to build this, because that sandbox blocks youtube.com. Loading it unpacked on a real browser and checking a real channel page is the next verification step, and is not claimed here.
+- Shorts, embeds, and live pages are parsed for a video id where possible, but the main path tested is a standard watch page and a channel Videos page.
+
+## Development
+
+Tests are plain Node, no build step:
+
+```
+node tests/test.js
+```
+
+The demo page at `demo/channel-mock.html` renders the same panel styles and list code with sample data, for screenshots without publishing real watch history.
+
+## Files
+
+- `manifest.json`: Manifest V3, permissions, content script, popup, background worker.
+- `src/shared.js`: parsing, channel matching, dedupe, sorting, and rendering. Shared by the extension and the tests.
+- `src/content.js`: History button, panel, and forward watch recording on YouTube pages.
+- `src/content.css`: History button and panel styles.
+- `src/background.js`: storage, backfill from browser history, and oEmbed channel lookup.
+- `src/popup.html`, `src/popup.js`: count, backfill button, and clear button.
+- `src/` icons in `icons/`: extension icons.
+- `demo/`: demo channel page and placeholder thumbnails, sample data only.
+- `tests/test.js`: parsing, channel match, filter, dedupe, sort, rendering, and escaping.
+
+## License
+
+MIT. See `LICENSE`.
