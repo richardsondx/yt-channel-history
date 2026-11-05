@@ -112,6 +112,21 @@ function renderWatchListHtml(watches) {
   return '<div class="ytch-list">' + items + '</div>';
 }
 
+function renderWatchGridHtml(watches) {
+  const list = sortWatchesDesc(dedupeWatches(watches));
+  if (list.length === 0) {
+    return '<div class="ytch-empty">No watched videos from this channel yet. Watch a video here and it will show up in this list.</div>';
+  }
+  const items = list.map(function (w) {
+    const thumb = w.thumbnail || ("https://i.ytimg.com/vi/" + w.videoId + "/mqdefault.jpg");
+    return '<a class="ytch-grid-item" href="' + escapeHtml(w.url || ("https://www.youtube.com/watch?v=" + w.videoId)) + '">' +
+      '<img class="ytch-grid-thumb" src="' + escapeHtml(thumb) + '" alt="" loading="lazy">' +
+      '<span class="ytch-grid-title">' + escapeHtml(w.title || w.videoId) + '</span>' +
+      '<span class="ytch-grid-meta">Watched ' + escapeHtml(formatWatchedDate(w.watchedAt)) + '</span></a>';
+  }).join("");
+  return '<div class="ytch-grid">' + items + '</div>';
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     parseVideoId: parseVideoId,
@@ -125,6 +140,7 @@ if (typeof module !== "undefined" && module.exports) {
     sortWatchesDesc: sortWatchesDesc,
     escapeHtml: escapeHtml,
     formatWatchedDate: formatWatchedDate,
-    renderWatchListHtml: renderWatchListHtml
+    renderWatchListHtml: renderWatchListHtml,
+    renderWatchGridHtml: renderWatchGridHtml
   };
 }

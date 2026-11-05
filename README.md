@@ -2,15 +2,15 @@
 
 A Chrome extension that adds a History view to a YouTube channel, so you can see the videos you watched from that channel, in one place.
 
-Open a channel Videos page. Next to Latest, Popular, and Oldest, you will see a History button. Click it to see that channel's watched videos, newest watched first, with a link back to each video.
+Open a channel Videos page. Next to Latest, Popular, and Oldest, you will see a History chip, in the same row and at the same size. Click it and it looks selected, and the grid below changes to that channel's watched videos, newest watched first, in the same video layout, with a link back to each video and the date you watched it. Click Latest, Popular, Oldest, or History again to bring the normal grid back.
 
-![History panel, demo data](screenshots/history-panel.png)
+![History grid, demo data](screenshots/history-panel.png)
 
 ![Popup](screenshots/popup.png)
 
 ![Empty state, demo data](screenshots/empty-state.png)
 
-Screenshots use demo data, not real watch history. The History panel in the screenshots is the same panel code and styles as the extension, with a Back to videos button to return to the channel videos.
+Screenshots use demo data, not real watch history. The History grid in the screenshots uses the same grid code and styles as the extension.
 
 ## Install, load unpacked
 
@@ -48,7 +48,7 @@ Permissions, and why each is needed:
 ## Limits, stated plainly
 
 - Backfill is capped, not literally every video ever watched. Browser history retention, the 1000 item search cap, and the 200 lookup batch per run all bound it. Videos whose channel lookup fails are kept without channel info, and will not show on a channel page until a later forward watch of the same video fills the channel in.
-- YouTube can change its page layout. The extension looks for the Latest, Popular, and Oldest chips, and falls back to placing the History button above the video grid if those chips are not found. Placement on a live, real YouTube channel page has not yet been verified in the sandbox used to build this, because that sandbox blocks youtube.com. Loading it unpacked on a real browser and checking a real channel page is the next verification step, and is not claimed here.
+- YouTube can change its page layout. The extension looks for the Latest, Popular, and Oldest chips in their chip bar, adds History as a chip in that same bar, and replaces the grid items container below it. If those chips are not found, it falls back to placing a History button above the video grid. Placement on a live, real YouTube channel page has not yet been verified in the sandbox used to build this, because that sandbox blocks youtube.com. Loading it unpacked on a real browser and checking a real channel page is the next verification step, and is not claimed here.
 - Shorts, embeds, and live pages are parsed for a video id where possible, but the main path tested is a standard watch page and a channel Videos page.
 
 ## Development
@@ -59,14 +59,14 @@ Tests are plain Node, no build step:
 node tests/test.js
 ```
 
-The demo page at `demo/channel-mock.html` renders the same panel styles and list code with sample data, for screenshots without publishing real watch history.
+The demo page at `demo/channel-mock.html` renders the same chip and grid styles and code with sample data, for screenshots without publishing real watch history.
 
 ## Files
 
 - `manifest.json`: Manifest V3, permissions, content script, popup, background worker.
 - `src/shared.js`: parsing, channel matching, dedupe, sorting, and rendering. Shared by the extension and the tests.
-- `src/content.js`: History button, panel, and forward watch recording on YouTube pages.
-- `src/content.css`: History button and panel styles.
+- `src/content.js`: History chip, grid replacement and restore, and forward watch recording on YouTube pages.
+- `src/content.css`: History chip and grid styles.
 - `src/background.js`: storage, backfill from browser history, and oEmbed channel lookup.
 - `src/popup.html`, `src/popup.js`: count, backfill button, and clear button.
 - `src/` icons in `icons/`: extension icons.

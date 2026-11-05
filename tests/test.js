@@ -44,4 +44,11 @@ const escaped = lib.renderWatchListHtml([{ videoId: "x", title: "<script>alert(1
 assert.ok(!escaped.includes("<script>alert"));
 assert.ok(lib.renderWatchListHtml([]).includes("No watched videos"));
 
-console.log("All tests passed: parsing, channel match, filter, dedupe, sort, rendering, escaping.");
+// Grid rendering: same layout as a channel grid, watched date as metadata
+const grid = lib.renderWatchGridHtml(filtered);
+assert.ok(grid.includes("ytch-grid") && grid.includes("Demo one") && grid.includes("Demo two"));
+assert.ok(grid.includes("Watched") && !grid.includes("Other one"));
+assert.ok(!lib.renderWatchGridHtml(filtered).includes("<script>alert"));
+assert.ok(lib.renderWatchGridHtml([]).includes("No watched videos"));
+
+console.log("All tests passed: parsing, channel match, filter, dedupe, sort, rendering, grid rendering, escaping.");

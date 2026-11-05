@@ -1,44 +1,124 @@
+/* History chip: use YouTube's own chip structure on a real page, so the
+   chip sits in the same row and at the same size as Latest, Popular, Oldest.
+   YouTube's own CSS styles .ytChipShapeChip; the rules below only fill the
+   gaps when that CSS is not present, and never override YouTube's sizing. */
+.ytChipShapeButtonReset {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+}
+/* Chip bar row, for pages and mocks without YouTube's stylesheet.
+   On a real page YouTube already lays this out as a row; this only
+   stops the wrappers stacking vertically when that CSS is absent. */
+chip-bar-view-model [role="tablist"] {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
 #ytch-history-button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+}
+/* Fallback button, used only when no YouTube chip bar is found. */
+#ytch-history-button:not(.ytChipShapeButtonReset) {
   display: inline-flex;
   align-items: center;
-  padding: 8px 14px;
+  padding: 8px 12px;
   margin: 4px;
-  border: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   background: #f2f2f2;
   color: #0f0f0f;
   font-size: 14px;
   font-weight: 500;
-  cursor: pointer;
 }
-#ytch-history-button.ytch-active {
+#ytch-history-button:not(.ytChipShapeButtonReset).ytch-active {
   background: #0f0f0f;
   color: #fff;
 }
-#ytch-history-panel {
-  margin: 16px 0 24px 0;
-  padding: 16px;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  background: #fff;
+/* Chip shape, for pages and mocks without YouTube's stylesheet. */
+.ytChipShapeChip {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f0f0f;
   font-family: Roboto, Arial, sans-serif;
 }
-#ytch-history-panel .ytch-heading {
+.ytChipShapeChip.ytChipShapeActive {
+  background: #0f0f0f;
+  color: #fff;
+}
+.ytChipShapeText {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+/* History grid: same item layout as a channel grid, thumbnail on top,
+   title under it, watched date where views and age sit on a normal item. */
+.ytch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  font-family: Roboto, Arial, sans-serif;
+}
+@media (max-width: 1100px) {
+  .ytch-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .ytch-grid { grid-template-columns: 1fr; }
+}
+.ytch-grid-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  color: #0f0f0f;
+  min-width: 0;
 }
-#ytch-history-panel .ytch-close {
-  border: 0;
-  background: #f2f2f2;
-  border-radius: 999px;
-  padding: 6px 12px;
-  cursor: pointer;
+.ytch-grid-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #eee;
+}
+.ytch-grid-title {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ytch-grid-meta {
   font-size: 13px;
+  color: #606060;
 }
+.ytch-empty {
+  font-size: 14px;
+  color: #606060;
+  padding: 12px 0;
+  font-family: Roboto, Arial, sans-serif;
+}
+.ytch-grid-loading {
+  font-size: 14px;
+  color: #606060;
+  padding: 12px 0;
+  font-family: Roboto, Arial, sans-serif;
+}
+/* Old list rendering, kept for the popup and tests. */
 .ytch-list {
   display: flex;
   flex-direction: column;
@@ -54,7 +134,7 @@
   width: 168px;
   height: 94px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #eee;
   flex-shrink: 0;
 }
@@ -71,9 +151,4 @@
 .ytch-date {
   font-size: 13px;
   color: #606060;
-}
-.ytch-empty {
-  font-size: 14px;
-  color: #606060;
-  padding: 12px 0;
 }

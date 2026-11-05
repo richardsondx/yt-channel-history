@@ -2,51 +2,103 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Demo Channel - Videos</title>
+<title>Mr Morj - Videos, demo</title>
 <link rel="stylesheet" href="../src/content.css">
 <style>
-body { font-family: Roboto, Arial, sans-serif; margin: 0 auto; max-width: 1000px; padding: 24px; color: #0f0f0f; }
-.tabs { display: flex; gap: 24px; font-size: 15px; border-bottom: 1px solid #e5e5e5; padding-bottom: 8px; }
-.tabs b { border-bottom: 2px solid #0f0f0f; padding-bottom: 8px; }
-.pills { display: flex; gap: 8px; margin: 16px 0; }
-.pill { padding: 8px 14px; border-radius: 999px; background: #f2f2f2; font-size: 14px; }
-.pill.active { background: #0f0f0f; color: #fff; }
-.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.card img { width: 100%; border-radius: 8px; background: #eee; }
+body { font-family: Roboto, Arial, sans-serif; margin: 0 auto; max-width: 1100px; padding: 24px; color: #0f0f0f; }
+.header { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; }
+.avatar { width: 110px; height: 110px; border-radius: 50%; background: #111; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: 700; flex-shrink: 0; }
+.header h1 { font-size: 32px; margin: 0 0 6px 0; }
+.header p { margin: 4px 0; color: #606060; font-size: 14px; }
+.tabs { display: flex; gap: 28px; font-size: 15px; border-bottom: 1px solid #e5e5e5; padding-bottom: 10px; }
+.tabs b { border-bottom: 2px solid #0f0f0f; padding-bottom: 10px; }
+chip-bar-view-model { display: block; margin: 18px 0; }
+.ytChipBarViewModelChipBarScrollContainer [role="tablist"], [role="tablist"] { display: flex; gap: 8px; flex-wrap: wrap; }
 .note { font-size: 13px; color: #606060; margin-top: 24px; }
 </style>
 </head>
 <body>
-<h1>Demo Channel</h1>
-<div class="tabs"><span>Home</span><b>Videos</b><span>Shorts</span><span>Live</span><span>Playlists</span></div>
-<div class="pills"><span class="pill">Latest</span><span class="pill active">Popular</span><span class="pill">Oldest</span></div>
-<div id="demo-panel"></div>
-<div class="grid">
-<div class="card"><img src="thumb1.png" alt=""><p>Demo video one</p></div>
-<div class="card"><img src="thumb1.png" alt=""><p>Demo video two</p></div>
-<div class="card"><img src="thumb1.png" alt=""><p>Demo video three</p></div>
+<div class="header">
+<div class="avatar">M</div>
+<div>
+<h1>Mr Morj</h1>
+<p>@MrMorj &middot; 241K subscribers &middot; 774 videos</p>
+<p>One Piece Analysis, Chapter Reviews, Theories, and General Discussion!</p>
 </div>
-<p class="note">Demo page only. It uses the same panel styles and list rendering as the extension, with sample data, so the screenshot shows the real History panel design without publishing real watch history.</p>
+</div>
+<div class="tabs"><span>Home</span><b>Videos</b><span>Shorts</span><span>Live</span><span>Playlists</span><span>Posts</span><span>Store</span></div>
+<ytd-rich-grid-renderer>
+<div id="header">
+<chip-bar-view-model><div role="tablist" class="ytChipBarViewModelChipBarScrollContainer">
+<div role="presentation" class="ytChipBarViewModelChipWrapper"><chip-view-model><chip-shape><button class="ytChipShapeButtonReset" role="tab" aria-label="Latest" aria-selected="true"><div class="ytChipShapeChip ytChipShapeActive ytChipShapeOnlyTextPadding"><div class="ytChipShapeText">Latest</div></div></button></chip-shape></chip-view-model></div>
+<div role="presentation" class="ytChipBarViewModelChipWrapper"><chip-view-model><chip-shape><button class="ytChipShapeButtonReset" role="tab" aria-label="Popular" aria-selected="false"><div class="ytChipShapeChip ytChipShapeInactive ytChipShapeOnlyTextPadding"><div class="ytChipShapeText">Popular</div></div></button></chip-shape></chip-view-model></div>
+<div role="presentation" class="ytChipBarViewModelChipWrapper"><chip-view-model><chip-shape><button class="ytChipShapeButtonReset" role="tab" aria-label="Oldest" aria-selected="false"><div class="ytChipShapeChip ytChipShapeInactive ytChipShapeOnlyTextPadding"><div class="ytChipShapeText">Oldest</div></div></button></chip-shape></chip-view-model></div>
+</div></chip-bar-view-model>
+</div>
+<div id="contents">
+<div class="ytch-grid" id="original-grid">
+<a class="ytch-grid-item" href="https://www.youtube.com/watch?v=gBWEjKGmMBo"><img class="ytch-grid-thumb" src="thumb1.png" alt=""><span class="ytch-grid-title">Sanji: One Piece's Most Layered Character Arc</span><span class="ytch-grid-meta">65K &middot; 1d ago</span></a>
+<a class="ytch-grid-item" href="https://www.youtube.com/watch?v=vnmj5zKHLP0"><img class="ytch-grid-thumb" src="thumb2.png" alt=""><span class="ytch-grid-title">One Piece Chapter 1197 Review: A PHENOMENAL CHARACTER ARC!!</span><span class="ytch-grid-meta">79K &middot; 4d ago</span></a>
+<a class="ytch-grid-item" href="https://www.youtube.com/watch?v=6fYBELhYsDg"><img class="ytch-grid-thumb" src="thumb1.png" alt=""><span class="ytch-grid-title">Why Sanji And Usopp Have The Same Character Arc | Analysis</span><span class="ytch-grid-meta">60K &middot; 7d ago</span></a>
+</div>
+</div>
+</ytd-rich-grid-renderer>
+<p class="note">Demo page only, based on the public MrMorj channel page layout. Sample watched data only, not real watch history. History replaces the grid below, in the same layout, like Latest, Popular, and Oldest.</p>
 <script src="../src/shared.js"></script>
 <script>
 var watches = [
-  { videoId: "demo1", title: "How I built a channel history tab", url: "https://www.youtube.com/watch?v=demo1", channelHandle: "DemoChannel", watchedAt: Date.now() - 86400000, thumbnail: "thumb1.png" },
-  { videoId: "demo2", title: "The simplest feature YouTube is missing", url: "https://www.youtube.com/watch?v=demo2", channelHandle: "DemoChannel", watchedAt: Date.now() - 172800000, thumbnail: "thumb2.png" },
+  { videoId: "morj1", title: "Sanji: One Piece's Most Layered Character Arc", url: "https://www.youtube.com/watch?v=morj1", channelHandle: "MrMorj", watchedAt: new Date("2026-11-03T12:00:00Z").getTime(), thumbnail: "thumb1.png" },
+  { videoId: "morj2", title: "One Piece Chapter 1197 Review: A PHENOMENAL CHARACTER ARC!!", url: "https://www.youtube.com/watch?v=morj2", channelHandle: "MrMorj", watchedAt: new Date("2026-11-02T12:00:00Z").getTime(), thumbnail: "thumb2.png" },
+  { videoId: "morj3", title: "Why Sanji And Usopp Have The Same Character Arc | Analysis", url: "https://www.youtube.com/watch?v=morj3", channelHandle: "MrMorj", watchedAt: new Date("2026-10-31T12:00:00Z").getTime(), thumbnail: "thumb1.png" },
   { videoId: "other1", title: "Not this channel", url: "https://www.youtube.com/watch?v=other1", channelHandle: "OtherChannel", watchedAt: Date.now(), thumbnail: "thumb1.png" }
 ];
-var channel = { handle: "DemoChannel" };
-var filtered = filterByChannel(watches, channel);
+var filtered = filterByChannel(watches, { handle: "MrMorj" });
+var contents = document.getElementById("contents");
+var original = contents.innerHTML;
+var historyActive = false;
+var savedChip = null;
+function setChip(btn, active) {
+  btn.setAttribute("aria-selected", active ? "true" : "false");
+  var inner = btn.querySelector(".ytChipShapeChip");
+  if (inner) { inner.classList.toggle("ytChipShapeActive", active); inner.classList.toggle("ytChipShapeInactive", !active); }
+}
+function sortButtons() {
+  return Array.from(document.querySelectorAll('button[aria-label="Latest"], button[aria-label="Popular"], button[aria-label="Oldest"]'));
+}
+sortButtons().forEach(function (b) {
+  b.addEventListener("click", function () {
+    if (!historyActive) return;
+    historyActive = false;
+    contents.innerHTML = original;
+    setChip(document.getElementById("ytch-history-button"), false);
+  }, true);
+});
+var wrapper = document.createElement("div");
+wrapper.setAttribute("role", "presentation");
+wrapper.className = "ytChipBarViewModelChipWrapper";
 var button = document.createElement("button");
 button.id = "ytch-history-button";
-button.textContent = "History";
-document.querySelector(".pills").appendChild(button);
+button.type = "button";
+button.className = "ytChipShapeButtonReset";
+button.setAttribute("role", "tab");
+button.setAttribute("aria-label", "History");
+button.setAttribute("aria-selected", "false");
+button.innerHTML = '<div class="ytChipShapeChip ytChipShapeInactive ytChipShapeOnlyTextPadding"><div class="ytChipShapeText">History</div></div>';
+wrapper.appendChild(button);
+document.querySelector('[role="tablist"]').appendChild(wrapper);
 button.addEventListener("click", function () {
-  var existing = document.getElementById("ytch-history-panel");
-  if (existing) { existing.remove(); return; }
-  var panel = document.createElement("div");
-  panel.id = "ytch-history-panel";
-  panel.innerHTML = '<div class="ytch-heading"><span>History on this channel</span><button class="ytch-close" type="button">Back to videos</button></div><div class="ytch-body">' + renderWatchListHtml(filtered) + '</div>';
-  document.getElementById("demo-panel").appendChild(panel);
+  if (historyActive) {
+    historyActive = false;
+    contents.innerHTML = original;
+    setChip(button, false);
+    if (savedChip) setChip(savedChip, true);
+    return;
+  }
+  savedChip = sortButtons().find(function (b) { return b.getAttribute("aria-selected") === "true"; });
+  historyActive = true;
+  setChip(button, true);
+  sortButtons().forEach(function (b) { setChip(b, false); });
+  contents.innerHTML = renderWatchGridHtml(filtered);
 });
 button.click();
 </script>
