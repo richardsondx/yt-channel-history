@@ -175,7 +175,7 @@ function formatWatchedDate(timestamp) {
 function renderWatchListHtml(watches) {
   const list = sortWatchesDesc(dedupeWatches(watches));
   if (list.length === 0) {
-    return '<div class="ytch-empty">No watched videos found for this channel in this browser or in the progress markers on this page. Import your YouTube watch history from Takeout in the popup to see all of them.</div>';
+    return '<div class="ytch-empty">No watched videos found for this channel in this browser or in the progress markers on this page. <a href="https://takeout.google.com/?pli=1" target="_blank" rel="noopener">Get your watch history from Google Takeout</a>, Google\'s tool to download a copy of your data, then import watch-history.json in the popup to see all of them.</div>';
   }
   const items = list.map(function (w) {
     const thumb = w.thumbnail || ("https://i.ytimg.com/vi/" + w.videoId + "/mqdefault.jpg");
@@ -190,7 +190,7 @@ function renderWatchListHtml(watches) {
 function renderWatchGridHtml(watches) {
   const list = sortWatchesDesc(dedupeWatches(watches));
   if (list.length === 0) {
-    return '<div class="ytch-empty">No watched videos found for this channel in this browser or in the progress markers on this page. Import your YouTube watch history from Takeout in the popup to see all of them.</div>';
+    return '<div class="ytch-empty">No watched videos found for this channel in this browser or in the progress markers on this page. <a href="https://takeout.google.com/?pli=1" target="_blank" rel="noopener">Get your watch history from Google Takeout</a>, Google\'s tool to download a copy of your data, then import watch-history.json in the popup to see all of them.</div>';
   }
   const items = list.map(function (w) {
     const thumb = w.thumbnail || ("https://i.ytimg.com/vi/" + w.videoId + "/mqdefault.jpg");

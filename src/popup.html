@@ -15,11 +15,12 @@ button.secondary { background: #f2f2f2; color: #0f0f0f; }
 <h1>YouTube Channel History</h1>
 <p id="version">Version 0.2.4</p>
 <p id="count">Loading...</p>
-<p>Your watched videos stay in this browser. Nothing is sent to a server, except a public video lookup when backfilling a channel name. Takeout import reads a file you pick, locally, and sends nothing anywhere.</p>
+<p>Your watched videos stay in this browser. Nothing is sent to a server, except a public video lookup when backfilling a channel name.</p>
+<p style="font-size:13px;color:#444;line-height:1.4">Google Takeout is Google's own tool to download a copy of your YouTube watch history. Get your file here: <a href="https://takeout.google.com/?pli=1" target="_blank" rel="noopener">Google Takeout</a>. Pick YouTube and YouTube Music, then Watch history, download watch-history.json, then pick that file below. The file is read locally in this browser, nothing is uploaded.</p>
 <button id="backfill" type="button">Run backfill from browser history</button>
 <button id="import-takeout" type="button">Import YouTube watch history (Takeout JSON)</button>
 <input id="takeout-file" type="file" accept=".json,application/json" style="display:none">
-<p id="import-help" style="font-size:12px;color:#606060">Get it at takeout.google.com, select YouTube and YouTube Music, Watch history, download watch-history.json, then pick that file here.</p>
+<p id="import-help" style="font-size:12px;color:#606060">No file yet? Start at <a href="https://takeout.google.com/?pli=1" target="_blank" rel="noopener">Google Takeout</a>, then pick the downloaded watch-history.json here.</p>
 <button id="clear" class="secondary" type="button">Clear local watched list</button>
 <div id="status"></div>
 <script src="shared.js"></script>
