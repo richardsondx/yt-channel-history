@@ -72,16 +72,52 @@ async function backfill() {
   return { added: resolved.length, repaired: resolved.filter(function (w) { return knownById.has(w.videoId); }).length, total: merged.length };
 }
 
+async function repairChannelMap(channel) {
+  if (!channel || (!channel.handle && !channel.channelId)) return;
+  const watches = await getWatches();
+  let changed = false;
+  watches.forEach(function (w) {
+    if (!w) return;
+    if (channel.handle && w.channelHandle && channel.handle.toLowerCase().replace(/^@/, "") === String(w.channelHandle).toLowerCase().replace(/^@/, "") && channel.channelId && !w.channelId) { w.channelId = channel.channelId; changed = true; }
+    if (channel.channelId && w.channelId === channel.channelId && channel.handle && !w.channelHandle) { w.channelHandle = channel.handle; changed = true; }
+  });
+  if (changed) await saveWatches(watches);
+}
+
 chrome.runtime.onInstalled.addListener(function () {
   backfill().catch(function () {});
+});
+
+chrome.runtime.onStartup.addListener(function () {
+  // Backfill used to run only on install, so a reload could leave an
+  // empty store with no re-run. Re-run at most once a day.
+  chrome.storage.local.get(["backfilledAt"]).then(function (data) {
+    const last = data.backfilledAt || 0;
+    if (Date.now() - last > 24 * 60 * 60 * 1000) backfill().catch(function () {});
+  }).catch(function () {});
 });
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!message || !message.type) return;
   if (message.type === "ytch-get-watches") {
-    getWatches().then(function (watches) {
-      sendResponse({ watches: filterByChannel(watches, message.channel || null) });
+    repairChannelMap(message.channel || null).then(function () { return getWatches(); }).then(function (watches) {
+      sendResponse({ watches: watches, total: watches.length, channel: message.channel || null });
     });
+    return true;
+  }
+  if (message.type === "ytch-channel-map") {
+    repairChannelMap(message.channel || null).then(function () { sendResponse({ ok: true }); });
+    return true;
+  }
+  if (message.type === "ytch-import-takeout") {
+    const watches = Array.isArray(message.watches) ? message.watches : [];
+    getWatches().then(function (existing) {
+      const before = existing.length;
+      const merged = mergeWatches(existing, watches);
+      return saveWatches(merged).then(function () {
+        return chrome.storage.local.set({ importedAt: Date.now(), takeoutImported: watches.length });
+      }).then(function () { sendResponse({ ok: true, imported: watches.length, newCount: merged.length - before, total: merged.length }); });
+    }).catch(function (e) { sendResponse({ ok: false, error: String(e && e.message || e) }); });
     return true;
   }
   if (message.type === "ytch-record-watch") {
@@ -96,12 +132,8 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message.type === "ytch-import-watches") {
     const watches = Array.isArray(message.watches) ? message.watches : [];
     getWatches().then(function (existing) {
-      const existingIds = new Set(existing.map(function (w) { return w.videoId; }));
-      const merged = mergeWatches(existing, watches);
-      const added = watches.filter(function (w) { return w && w.videoId && !existingIds.has(w.videoId); }).length;
-      return chrome.storage.local.set({ watches: merged, lastImportAt: Date.now() })
-        .then(function () { sendResponse({ ok: true, added: added, total: merged.length }); });
-    }).catch(function (e) { sendResponse({ ok: false, error: String(e && e.message || e) }); });
+      return saveWatches(mergeWatches(existing, watches)).then(function () { sendResponse({ ok: true }); });
+    }).catch(function () { sendResponse({ ok: false }); });
     return true;
   }
   if (message.type === "ytch-backfill") {

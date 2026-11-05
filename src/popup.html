@@ -15,10 +15,11 @@ button.secondary { background: #f2f2f2; color: #0f0f0f; }
 <h1>YouTube Channel History</h1>
 <p id="version">Version 0.2.4</p>
 <p id="count">Loading...</p>
-<p>Your watch history stays in this browser. Takeout imports are read locally and are not uploaded. Backfill sends video URLs to YouTube's public lookup service to resolve channel names.</p>
-<button id="import" type="button">Import Google Takeout watch-history.json</button>
-<input id="takeout-file" type="file" accept=".json,application/json" hidden>
+<p>Your watched videos stay in this browser. Nothing is sent to a server, except a public video lookup when backfilling a channel name. Takeout import reads a file you pick, locally, and sends nothing anywhere.</p>
 <button id="backfill" type="button">Run backfill from browser history</button>
+<button id="import-takeout" type="button">Import YouTube watch history (Takeout JSON)</button>
+<input id="takeout-file" type="file" accept=".json,application/json" style="display:none">
+<p id="import-help" style="font-size:12px;color:#606060">Get it at takeout.google.com, select YouTube and YouTube Music, Watch history, download watch-history.json, then pick that file here.</p>
 <button id="clear" class="secondary" type="button">Clear local watched list</button>
 <div id="status"></div>
 <script src="shared.js"></script>

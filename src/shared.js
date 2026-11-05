@@ -48,44 +48,69 @@ function channelFromAuthorUrl(authorUrl) {
   return channelFromUrl(authorUrl);
 }
 
-function parseTakeoutWatchHistory(entries) {
-  if (!Array.isArray(entries)) throw new Error("The selected file must contain a Google Takeout YouTube history array.");
-  const watches = [];
-  entries.forEach(function (entry) {
-    if (!entry || typeof entry !== "object") return;
-    const videoId = parseVideoId(entry.titleUrl || "");
-    if (!videoId) return;
-    const subtitle = Array.isArray(entry.subtitles) ? entry.subtitles.find(function (item) {
-      return item && typeof item.url === "string";
-    }) : null;
-    const channel = subtitle ? channelFromUrl(subtitle.url) : null;
-    const title = String(entry.title || "").replace(/^Watched\s+/i, "").trim();
-    const watchedAt = entry.time ? Date.parse(entry.time) : null;
-    watches.push({
-      videoId: videoId,
-      title: title || videoId,
-      url: "https://www.youtube.com/watch?v=" + videoId,
-      thumbnail: "https://i.ytimg.com/vi/" + videoId + "/mqdefault.jpg",
-      channelName: subtitle ? subtitle.name || null : null,
-      channelHandle: channel && channel.handle ? channel.handle : null,
-      channelId: channel && channel.channelId ? channel.channelId : null,
-      channelUrl: channel ? channel.url : (subtitle ? subtitle.url : null),
-      watchedAt: Number.isFinite(watchedAt) ? watchedAt : null,
-      source: "takeout"
-    });
-  });
-  return dedupeWatches(watches);
-}
-
 function watchMatchesChannel(watch, channel) {
   if (!watch || !channel) return false;
   if (channel.channelId && watch.channelId && watch.channelId === channel.channelId) return true;
   if (channel.handle && watch.channelHandle && normalizeKey(watch.channelHandle) === normalizeKey(channel.handle)) return true;
-  if (channel.handle && watch.channelUrl) {
+  // Cross match via channelUrl on either side: a stored record with
+  // only a handle can match a page channel with only an id, if the
+  // stored channelUrl carries the other piece, and vice versa.
+  if (watch.channelUrl) {
     const fromUrl = channelFromUrl(watch.channelUrl);
-    if (fromUrl && fromUrl.handle && normalizeKey(fromUrl.handle) === normalizeKey(channel.handle)) return true;
+    if (fromUrl) {
+      if (channel.channelId && fromUrl.channelId && fromUrl.channelId === channel.channelId) return true;
+      if (channel.handle && fromUrl.handle && normalizeKey(fromUrl.handle) === normalizeKey(channel.handle)) return true;
+    }
+  }
+  if (channel.url) {
+    const fromChannelUrl = channelFromUrl(channel.url);
+    if (fromChannelUrl) {
+      if (watch.channelId && fromChannelUrl.channelId && watch.channelId === fromChannelUrl.channelId) return true;
+      if (watch.channelHandle && fromChannelUrl.handle && normalizeKey(watch.channelHandle) === normalizeKey(fromChannelUrl.handle)) return true;
+    }
   }
   return false;
+}
+
+function combineChannel(a, b) {
+  if (!a && !b) return null;
+  if (!a) return b;
+  if (!b) return a;
+  return {
+    channelId: a.channelId || b.channelId || null,
+    handle: a.handle || b.handle || null,
+    url: (a.channelId || b.channelId) ? ("https://www.youtube.com/channel/" + (a.channelId || b.channelId)) : (a.url || b.url || null)
+  };
+}
+
+function parseTakeoutEntries(entries) {
+  // Google Takeout watch-history.json is a JSON array. Each entry has
+  // title, titleUrl with the video id, time with the watched date, and
+  // subtitles, usually one entry, with the channel name and channel url.
+  // Parsed locally, no network, no upload.
+  if (!Array.isArray(entries)) return [];
+  const out = [];
+  entries.forEach(function (e) {
+    if (!e || !e.titleUrl) return;
+    const videoId = parseVideoId(e.titleUrl);
+    if (!videoId) return;
+    const watchedAt = e.time ? Date.parse(e.time) : null;
+    const sub = Array.isArray(e.subtitles) && e.subtitles[0] ? e.subtitles[0] : null;
+    const ch = sub && sub.url ? channelFromUrl(sub.url) : null;
+    out.push({
+      videoId: videoId,
+      title: e.title ? String(e.title).replace(/^Watched\s+/, "") : videoId,
+      url: "https://www.youtube.com/watch?v=" + videoId,
+      thumbnail: "https://i.ytimg.com/vi/" + videoId + "/mqdefault.jpg",
+      channelName: sub && sub.name ? sub.name : null,
+      channelHandle: ch && ch.handle ? ch.handle : null,
+      channelId: ch && ch.channelId ? ch.channelId : null,
+      channelUrl: ch ? ch.url : (sub && sub.url ? sub.url : null),
+      watchedAt: watchedAt && !isNaN(watchedAt) ? watchedAt : null,
+      source: "takeout"
+    });
+  });
+  return out;
 }
 
 function filterByChannel(watches, channel) {
@@ -100,15 +125,13 @@ function dedupeWatches(watches) {
     if (!w || !w.videoId) return;
     const existing = byId.get(w.videoId);
     if (!existing) { byId.set(w.videoId, w); return; }
-    // Preserve useful identity fields from both sources (oEmbed often has
-    // only a handle, while Takeout has a channel id) and keep the latest date.
-    const combined = Object.assign({}, existing, w);
-    ["channelName", "channelHandle", "channelId", "channelUrl", "thumbnail"].forEach(function (key) {
-      if (!w[key]) combined[key] = existing[key] || null;
-    });
-    if (!w.title || w.title === w.videoId) combined.title = existing.title || w.title;
-    if (!w.watchedAt || (existing.watchedAt && existing.watchedAt > w.watchedAt)) combined.watchedAt = existing.watchedAt || null;
-    byId.set(w.videoId, combined);
+    // Prefer a record that actually knows its channel, and a newer date,
+    // so a repair lookup can fill in a channel that was missing before.
+    const existingHasChannel = !!(existing.channelHandle || existing.channelId || existing.channelUrl);
+    const nextHasChannel = !!(w.channelHandle || w.channelId || w.channelUrl);
+    if (nextHasChannel && !existingHasChannel) { byId.set(w.videoId, w); return; }
+    if (!nextHasChannel && existingHasChannel) return;
+    if ((w.watchedAt || 0) > (existing.watchedAt || 0)) byId.set(w.videoId, w);
   });
   return Array.from(byId.values());
 }
@@ -152,7 +175,7 @@ function formatWatchedDate(timestamp) {
 function renderWatchListHtml(watches) {
   const list = sortWatchesDesc(dedupeWatches(watches));
   if (list.length === 0) {
-    return '<div class="ytch-empty">No saved watched videos were found for this channel. If you watched on another device or cleared browser history, import your YouTube watch-history.json from Google Takeout in the extension popup.</div>';
+    return '<div class="ytch-empty">No watched videos found for this channel in this browser or in the progress markers on this page. Import your YouTube watch history from Takeout in the popup to see all of them.</div>';
   }
   const items = list.map(function (w) {
     const thumb = w.thumbnail || ("https://i.ytimg.com/vi/" + w.videoId + "/mqdefault.jpg");
@@ -167,7 +190,7 @@ function renderWatchListHtml(watches) {
 function renderWatchGridHtml(watches) {
   const list = sortWatchesDesc(dedupeWatches(watches));
   if (list.length === 0) {
-    return '<div class="ytch-empty">No saved watched videos were found for this channel. If you watched on another device or cleared browser history, import your YouTube watch-history.json from Google Takeout in the extension popup.</div>';
+    return '<div class="ytch-empty">No watched videos found for this channel in this browser or in the progress markers on this page. Import your YouTube watch history from Takeout in the popup to see all of them.</div>';
   }
   const items = list.map(function (w) {
     const thumb = w.thumbnail || ("https://i.ytimg.com/vi/" + w.videoId + "/mqdefault.jpg");
@@ -187,7 +210,6 @@ if (typeof module !== "undefined" && module.exports) {
     normalizeKey: normalizeKey,
     channelFromUrl: channelFromUrl,
     channelFromAuthorUrl: channelFromAuthorUrl,
-    parseTakeoutWatchHistory: parseTakeoutWatchHistory,
     watchMatchesChannel: watchMatchesChannel,
     filterByChannel: filterByChannel,
     dedupeWatches: dedupeWatches,
@@ -196,6 +218,8 @@ if (typeof module !== "undefined" && module.exports) {
     escapeHtml: escapeHtml,
     formatWatchedDate: formatWatchedDate,
     renderWatchListHtml: renderWatchListHtml,
-    renderWatchGridHtml: renderWatchGridHtml
+    renderWatchGridHtml: renderWatchGridHtml,
+    combineChannel: combineChannel,
+    parseTakeoutEntries: parseTakeoutEntries
   };
 }

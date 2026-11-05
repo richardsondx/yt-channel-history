@@ -26,22 +26,22 @@ No Chrome Web Store listing is included in this repo. Loading unpacked is the in
 
 Three sources, all stored in your browser with `chrome.storage.local`:
 
-- Channel grid scan: when you click History, the extension scans currently loaded thumbnails for YouTube's visible watched progress markers. This is a supplement, not a complete account history; YouTube may omit markers and only loaded videos can be scanned.
+- Takeout import, the complete source: in the popup, click Import YouTube watch history, pick watch-history.json from Google Takeout (takeout.google.com, YouTube and YouTube Music, Watch history). The file is read locally in your browser, nothing is uploaded. It gives every watched video with its date and channel, including phone and TV watches, not only this browser.
+- Channel grid, a supplement on the page itself: when you click History, the extension first scans the channel grid already on screen for videos YouTube marks as watched, with the red progress bar on the thumbnail. That covers both the old resume-playback markup and the newer progress-bar markup, with a watched segment at any width above 0%. That list can include videos you watched on another device, but only when YouTube actually renders a progress marker for them, which it does not always do. Scroll the channel page to load more videos, then open History again, and newly loaded watched videos are added to the stored list.
 - Track forward: when a YouTube video page loads, the extension records the video, its title, and the channel from that page.
 - Backfill: the popup has a Run backfill button. It reads your browser history for `youtube.com/watch` pages, up to 1000 items, and looks up the channel for each video with the public YouTube oEmbed endpoint, which needs no key and no sign-in. Backfill runs in batches of 200, up to 1000 lookups per run, and it also re-checks videos already stored without a channel, so a failed lookup is not stuck forever.
-- Google Takeout: import `watch-history.json` from the popup for broader account watch history. The file is parsed locally and is not uploaded or sent to a server.
 
 A watch is recorded when a video page loads. It is not measured by how long you watched. That is a known limit, and a watch-time threshold is a possible next step, not part of this version.
 
-If you click Latest, Popular, or Oldest, YouTube replaces the chip bar. The extension watches for that replacement and puts History back in the new chip bar. On channels with a Members only filter, Latest is a dropdown, so History is placed in the same row as Latest, Members only, and Public.
+If you click Latest, Popular, or Oldest, YouTube replaces the chip bar, which used to delete the History chip until you refreshed the page. The extension now watches for that replacement and puts History back in the new chip bar, without a refresh. On channels with a Members only filter, Latest is a dropdown, not a tab, so History is placed in that Latest, Members only, Public chip row, in the same row, not on a second row.
 
-History hides the original video cards and renders the matching watched cards inside YouTube's `#contents` grid container. Clicking a sort restores the original cards and removes the History grid. History matches the page's handle as well as its canonical channel ID, since YouTube backfill lookups often return a handle while canonical links contain only the ID. When you click History, the console logs the grid item count, visible watched scan count, and stored and merged counts with the current `[YTCH 0.2.4]` tag.
+Version 0.2.0 changes how History is shown: it no longer replaces YouTube's managed grid contents, which YouTube can re-render and wipe. It hides the original grid and puts the History grid next to it, as a sibling, then shows the original grid again when you leave History. When you click History, it also logs to the browser console, with the tag [YTCH 0.2.0], how many grid items were on the page, how many were scanned as watched, and how many were stored for that channel. If History is still empty on a real page, that log is the first thing to check.
 
 ## Privacy
 
 Your watched list stays in your browser. There is no account, no server, and no analytics in this extension.
 
-Backfill sends video URLs from local Chrome history to the public YouTube oEmbed endpoint to resolve channel names. Takeout import reads the selected JSON file locally and makes no network requests.
+The one exception is backfill: to learn a channel name for a video already in your browser history, backfill sends that video URL to the public YouTube oEmbed endpoint. No sign-in is used, and no other data is sent with it.
 
 You can clear the stored list at any time from the popup.
 
@@ -53,8 +53,8 @@ Permissions, and why each is needed:
 
 ## Limits, stated plainly
 
-- Backfill is capped by Chrome's retained history and a 1000 item search limit, and covers this Chrome profile only. Grid scan covers loaded cards with visible markers only. For account-wide history, request and download a Google Takeout export yourself, then select its `watch-history.json` file in the popup.
-- YouTube can change its page layout. The extension was verified in real Chrome on MrMorj, AI Explained, and Matthew Berman, including History rendering and sort restoration. The Takeout file picker still needs validation with an actual export file.
+- Backfill is capped, not literally every video ever watched. Browser history retention and the 1000 item search cap bound it. Videos whose channel lookup fails are kept without channel info, and a later backfill re-checks them, so they are not stuck without a channel forever. For a complete list, use Takeout import above. The channel grid scan is not complete, because YouTube does not always render a progress marker, even for videos you watched.
+- YouTube can change its page layout. The extension looks for the Latest, Popular, and Oldest chips in their chip bar, adds History as a chip in that same bar, and replaces the grid items container below it. If those chips are not found, it falls back to placing a History button above the video grid. Placement on a live, real YouTube channel page has not yet been verified in the sandbox used to build this, because that sandbox blocks youtube.com. Loading it unpacked on a real browser and checking a real channel page is the next verification step, and is not claimed here.
 - Shorts, embeds, and live pages are parsed for a video id where possible, but the main path tested is a standard watch page and a channel Videos page.
 
 ## Development
@@ -74,7 +74,7 @@ The demo page at `demo/channel-mock.html` renders the same chip and grid styles 
 - `src/content.js`: History chip, grid replacement and restore, and forward watch recording on YouTube pages.
 - `src/content.css`: History chip and grid styles.
 - `src/background.js`: storage, backfill from browser history, and oEmbed channel lookup.
-- `src/popup.html`, `src/popup.js`: Takeout import, count, backfill button, and clear button.
+- `src/popup.html`, `src/popup.js`: count, backfill button, and clear button.
 - `src/` icons in `icons/`: extension icons.
 - `demo/`: demo channel page and placeholder thumbnails, sample data only.
 - `tests/test.js`: parsing, channel match, filter, dedupe, sort, rendering, and escaping.
