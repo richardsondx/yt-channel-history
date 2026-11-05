@@ -15,14 +15,24 @@
     savedChip: null,
     lastUrl: window.location.href,
     lastWatches: [],
-    lastChannel: null
+    lastChannel: null,
+    loading: false
   };
 
   function getChannelFromPage() {
     const canonical = document.querySelector('link[rel="canonical"]');
     const fromCanonical = canonical ? channelFromUrl(canonical.getAttribute("href") || "") : null;
-    if (fromCanonical) return fromCanonical;
-    return channelFromUrl(window.location.href);
+    const fromPageUrl = channelFromUrl(window.location.href);
+    if (!fromCanonical) return fromPageUrl;
+    if (!fromPageUrl) return fromCanonical;
+    // YouTube's canonical URL is often /channel/UC..., while the current
+    // page URL is /@handle. Keep both identities so backfilled records
+    // resolved by oEmbed (handle only) still match the page (id only).
+    return {
+      channelId: fromCanonical.channelId || fromPageUrl.channelId || null,
+      handle: fromPageUrl.handle || fromCanonical.handle || null,
+      url: fromCanonical.url || fromPageUrl.url
+    };
   }
 
   function isChannelVideosPage() {
@@ -240,6 +250,7 @@
     state.savedContents = null;
     state.savedChip = null;
     state.lastWatches = [];
+    state.loading = false;
   }
 
   function watchdog() {
@@ -254,7 +265,9 @@
     let grid = historyGridEl();
     if (!grid) {
       grid = ensureHistoryGrid();
-      grid.innerHTML = renderWatchGridHtml(state.lastWatches || []);
+      grid.innerHTML = state.loading
+        ? '<div class="ytch-grid-loading">Loading watched videos...</div>'
+        : renderWatchGridHtml(state.lastWatches || []);
     }
     const btn = document.getElementById("ytch-history-button");
     if (btn) setChip(btn, true);
@@ -266,18 +279,16 @@
     // Scan first, while the original grid is still on screen.
     const scanned = scanWatchedFromGrid(channel);
     const gridItemsOnPage = contents.querySelectorAll("ytd-rich-item-renderer, ytd-grid-video-renderer").length;
-    console.log("[YTCH 0.2.3] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
+    console.log("[YTCH 0.2.4] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
     state.savedChip = sortChipButtons().find(function (b) { return b.getAttribute("aria-selected") === "true"; }) || null;
     state.active = true;
+    state.loading = true;
     state.lastChannel = channel;
     const btn = document.getElementById("ytch-history-button");
     setChip(btn, true);
     sortChipButtons().forEach(function (b) { setChip(b, false); });
-    // History grid lives OUTSIDE YouTube's grid renderer, not inside
-    // its #contents and not as a sibling inside it. YouTube re-renders
-    // that renderer and wipes anything inside it, which is why the
-    // chip could be black while the grid was the original grid.
-    // Hide the original grid, show our grid outside the renderer.
+    // Keep the replacement grid under #contents so it uses YouTube's grid
+    // layout. Hide only the original items so the History grid remains visible.
     hideOriginalGrid();
     let historyGrid = ensureHistoryGrid();
     historyGrid.innerHTML = '<div class="ytch-grid-loading">Loading watched videos...</div>';
@@ -286,7 +297,8 @@
       const stored = filterByChannel((res && res.watches) || [], channel);
       const watches = mergeWatches(stored, scanned);
       state.lastWatches = watches;
-      console.log("[YTCH 0.2.3] stored for channel:", stored.length, "merged:", watches.length);
+      state.loading = false;
+      console.log("[YTCH 0.2.4] stored for channel:", stored.length, "merged:", watches.length);
       if (scanned.length) {
         chrome.runtime.sendMessage({ type: "ytch-import-watches", watches: scanned }).catch(function () {});
       }
@@ -296,8 +308,9 @@
         hideOriginalGrid();
       }
     } catch (e) {
-      console.log("[YTCH 0.2.3] stored load failed, showing scanned only:", e);
+      console.log("[YTCH 0.2.4] stored load failed, showing scanned only:", e);
       state.lastWatches = scanned;
+      state.loading = false;
       if (state.active) {
         historyGrid = ensureHistoryGrid();
         historyGrid.innerHTML = renderWatchGridHtml(scanned);
@@ -377,6 +390,7 @@
       state.savedContents = null;
       state.savedChip = null;
       state.lastWatches = [];
+      state.loading = false;
     }
     bindSortChips();
 
@@ -486,11 +500,16 @@
     if (typeof MutationObserver !== "undefined" && !window.__ytchObserver) {
       let pending = false;
       window.__ytchObserver = new MutationObserver(function () {
+        // Recover the visible History grid in the observer callback itself.
+        // YouTube can replace #contents wholesale, which removes our grid and
+        // briefly exposes the native cards. Rebuild it before yielding back
+        // to rendering; our own insertion is harmless because the grid now
+        // exists when the resulting mutation is observed.
+        if (state.active && !historyGridEl()) watchdog();
         if (pending) return;
         pending = true;
         setTimeout(function () {
           pending = false;
-          if (state.active) watchdog();
           if (isChannelVideosPage()) run();
         }, 200);
       });
@@ -501,7 +520,7 @@
       if (window.location.href !== lastUrl) { lastUrl = window.location.href; setTimeout(run, 500); return; }
       if (state.active) watchdog();
       if (isChannelVideosPage()) run();
-    }, 1000);
+    }, 250);
   }
 
   run();

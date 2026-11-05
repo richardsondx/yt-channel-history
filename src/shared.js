@@ -48,6 +48,35 @@ function channelFromAuthorUrl(authorUrl) {
   return channelFromUrl(authorUrl);
 }
 
+function parseTakeoutWatchHistory(entries) {
+  if (!Array.isArray(entries)) throw new Error("The selected file must contain a Google Takeout YouTube history array.");
+  const watches = [];
+  entries.forEach(function (entry) {
+    if (!entry || typeof entry !== "object") return;
+    const videoId = parseVideoId(entry.titleUrl || "");
+    if (!videoId) return;
+    const subtitle = Array.isArray(entry.subtitles) ? entry.subtitles.find(function (item) {
+      return item && typeof item.url === "string";
+    }) : null;
+    const channel = subtitle ? channelFromUrl(subtitle.url) : null;
+    const title = String(entry.title || "").replace(/^Watched\s+/i, "").trim();
+    const watchedAt = entry.time ? Date.parse(entry.time) : null;
+    watches.push({
+      videoId: videoId,
+      title: title || videoId,
+      url: "https://www.youtube.com/watch?v=" + videoId,
+      thumbnail: "https://i.ytimg.com/vi/" + videoId + "/mqdefault.jpg",
+      channelName: subtitle ? subtitle.name || null : null,
+      channelHandle: channel && channel.handle ? channel.handle : null,
+      channelId: channel && channel.channelId ? channel.channelId : null,
+      channelUrl: channel ? channel.url : (subtitle ? subtitle.url : null),
+      watchedAt: Number.isFinite(watchedAt) ? watchedAt : null,
+      source: "takeout"
+    });
+  });
+  return dedupeWatches(watches);
+}
+
 function watchMatchesChannel(watch, channel) {
   if (!watch || !channel) return false;
   if (channel.channelId && watch.channelId && watch.channelId === channel.channelId) return true;
@@ -71,13 +100,15 @@ function dedupeWatches(watches) {
     if (!w || !w.videoId) return;
     const existing = byId.get(w.videoId);
     if (!existing) { byId.set(w.videoId, w); return; }
-    // Prefer a record that actually knows its channel, and a newer date,
-    // so a repair lookup can fill in a channel that was missing before.
-    const existingHasChannel = !!(existing.channelHandle || existing.channelId || existing.channelUrl);
-    const nextHasChannel = !!(w.channelHandle || w.channelId || w.channelUrl);
-    if (nextHasChannel && !existingHasChannel) { byId.set(w.videoId, w); return; }
-    if (!nextHasChannel && existingHasChannel) return;
-    if ((w.watchedAt || 0) > (existing.watchedAt || 0)) byId.set(w.videoId, w);
+    // Preserve useful identity fields from both sources (oEmbed often has
+    // only a handle, while Takeout has a channel id) and keep the latest date.
+    const combined = Object.assign({}, existing, w);
+    ["channelName", "channelHandle", "channelId", "channelUrl", "thumbnail"].forEach(function (key) {
+      if (!w[key]) combined[key] = existing[key] || null;
+    });
+    if (!w.title || w.title === w.videoId) combined.title = existing.title || w.title;
+    if (!w.watchedAt || (existing.watchedAt && existing.watchedAt > w.watchedAt)) combined.watchedAt = existing.watchedAt || null;
+    byId.set(w.videoId, combined);
   });
   return Array.from(byId.values());
 }
@@ -121,7 +152,7 @@ function formatWatchedDate(timestamp) {
 function renderWatchListHtml(watches) {
   const list = sortWatchesDesc(dedupeWatches(watches));
   if (list.length === 0) {
-    return '<div class="ytch-empty">No watched videos from this channel yet. Watch a video here and it will show up in this list.</div>';
+    return '<div class="ytch-empty">No saved watched videos were found for this channel. If you watched on another device or cleared browser history, import your YouTube watch-history.json from Google Takeout in the extension popup.</div>';
   }
   const items = list.map(function (w) {
     const thumb = w.thumbnail || ("https://i.ytimg.com/vi/" + w.videoId + "/mqdefault.jpg");
@@ -136,7 +167,7 @@ function renderWatchListHtml(watches) {
 function renderWatchGridHtml(watches) {
   const list = sortWatchesDesc(dedupeWatches(watches));
   if (list.length === 0) {
-    return '<div class="ytch-empty">No watched videos from this channel yet. Watch a video here and it will show up in this list.</div>';
+    return '<div class="ytch-empty">No saved watched videos were found for this channel. If you watched on another device or cleared browser history, import your YouTube watch-history.json from Google Takeout in the extension popup.</div>';
   }
   const items = list.map(function (w) {
     const thumb = w.thumbnail || ("https://i.ytimg.com/vi/" + w.videoId + "/mqdefault.jpg");
@@ -156,6 +187,7 @@ if (typeof module !== "undefined" && module.exports) {
     normalizeKey: normalizeKey,
     channelFromUrl: channelFromUrl,
     channelFromAuthorUrl: channelFromAuthorUrl,
+    parseTakeoutWatchHistory: parseTakeoutWatchHistory,
     watchMatchesChannel: watchMatchesChannel,
     filterByChannel: filterByChannel,
     dedupeWatches: dedupeWatches,

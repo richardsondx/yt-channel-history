@@ -96,8 +96,12 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message.type === "ytch-import-watches") {
     const watches = Array.isArray(message.watches) ? message.watches : [];
     getWatches().then(function (existing) {
-      return saveWatches(mergeWatches(existing, watches)).then(function () { sendResponse({ ok: true }); });
-    }).catch(function () { sendResponse({ ok: false }); });
+      const existingIds = new Set(existing.map(function (w) { return w.videoId; }));
+      const merged = mergeWatches(existing, watches);
+      const added = watches.filter(function (w) { return w && w.videoId && !existingIds.has(w.videoId); }).length;
+      return chrome.storage.local.set({ watches: merged, lastImportAt: Date.now() })
+        .then(function () { sendResponse({ ok: true, added: added, total: merged.length }); });
+    }).catch(function (e) { sendResponse({ ok: false, error: String(e && e.message || e) }); });
     return true;
   }
   if (message.type === "ytch-backfill") {
