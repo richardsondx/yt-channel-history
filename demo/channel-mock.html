@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Mr Morj - Videos, demo</title>
+<title>Code with Richardson Dackam - Videos, demo</title>
 <link rel="stylesheet" href="../src/content.css">
 <style>
 body { font-family: Roboto, Arial, sans-serif; margin: 0 auto; max-width: 1100px; padding: 24px; color: #0f0f0f; }
@@ -19,11 +19,11 @@ chip-bar-view-model { display: block; margin: 18px 0; }
 </head>
 <body>
 <div class="header">
-<div class="avatar">M</div>
+<div class="avatar">C</div>
 <div>
-<h1>Mr Morj</h1>
-<p>@MrMorj &middot; 241K subscribers &middot; 774 videos</p>
-<p>One Piece Analysis, Chapter Reviews, Theories, and General Discussion!</p>
+<h1>Code with Richardson Dackam</h1>
+<p>@codewithrich &middot; 1.07K subscribers &middot; 42 videos</p>
+<p>Cursor AI tutorials and other deep dives into AI productivity tools with Richardson Dackam</p>
 </div>
 </div>
 <div class="tabs"><span>Home</span><b>Videos</b><span>Shorts</span><span>Live</span><span>Playlists</span><span>Posts</span><span>Store</span></div>
@@ -37,22 +37,22 @@ chip-bar-view-model { display: block; margin: 18px 0; }
 </div>
 <div id="contents">
 <div class="ytch-grid" id="original-grid">
-<a class="ytch-grid-item" href="https://www.youtube.com/watch?v=gBWEjKGmMBo"><img class="ytch-grid-thumb" src="thumb1.png" alt=""><span class="ytch-grid-title">Sanji: One Piece's Most Layered Character Arc</span><span class="ytch-grid-meta">65K &middot; 1d ago</span></a>
-<a class="ytch-grid-item" href="https://www.youtube.com/watch?v=vnmj5zKHLP0"><img class="ytch-grid-thumb" src="thumb2.png" alt=""><span class="ytch-grid-title">One Piece Chapter 1197 Review: A PHENOMENAL CHARACTER ARC!!</span><span class="ytch-grid-meta">79K &middot; 4d ago</span></a>
-<a class="ytch-grid-item" href="https://www.youtube.com/watch?v=6fYBELhYsDg"><img class="ytch-grid-thumb" src="thumb1.png" alt=""><span class="ytch-grid-title">Why Sanji And Usopp Have The Same Character Arc | Analysis</span><span class="ytch-grid-meta">60K &middot; 7d ago</span></a>
+<a class="ytch-grid-item" href="https://www.youtube.com/@codewithrich"><img class="ytch-grid-thumb" src="thumb1.png" alt=""><span class="ytch-grid-title">How I Generate PRDs to Build MVPs in a Weekend</span><span class="ytch-grid-meta">666 views &middot; 1y ago</span></a>
+<a class="ytch-grid-item" href="https://www.youtube.com/@codewithrich"><img class="ytch-grid-thumb" src="thumb2.png" alt=""><span class="ytch-grid-title">The 4 Pillars of AI Development (Most Teams Only Use One)</span><span class="ytch-grid-meta">683 views &middot; 1y ago</span></a>
+<a class="ytch-grid-item" href="https://www.youtube.com/@codewithrich"><img class="ytch-grid-thumb" src="thumb1.png" alt=""><span class="ytch-grid-title">Manual Workflow Building Is Dead</span><span class="ytch-grid-meta">396 views &middot; 1y ago</span></a>
 </div>
 </div>
 </ytd-rich-grid-renderer>
-<p class="note">Demo page only, based on the public MrMorj channel page layout. Sample watched data only, not real watch history. History replaces the grid below, in the same layout, like Latest, Popular, and Oldest.</p>
+<p class="note">Demo page only, based on the public @codewithrich channel page layout. Sample watched data only, not real watch history. History replaces the grid below, in the same layout, like Latest, Popular, and Oldest.</p>
 <script src="../src/shared.js"></script>
 <script>
 var watches = [
-  { videoId: "morj1", title: "Sanji: One Piece's Most Layered Character Arc", url: "https://www.youtube.com/watch?v=morj1", channelHandle: "MrMorj", watchedAt: new Date("2026-11-03T12:00:00Z").getTime(), thumbnail: "thumb1.png" },
-  { videoId: "morj2", title: "One Piece Chapter 1197 Review: A PHENOMENAL CHARACTER ARC!!", url: "https://www.youtube.com/watch?v=morj2", channelHandle: "MrMorj", watchedAt: new Date("2026-11-02T12:00:00Z").getTime(), thumbnail: "thumb2.png" },
-  { videoId: "morj3", title: "Why Sanji And Usopp Have The Same Character Arc | Analysis", url: "https://www.youtube.com/watch?v=morj3", channelHandle: "MrMorj", watchedAt: new Date("2026-10-31T12:00:00Z").getTime(), thumbnail: "thumb1.png" },
+  { videoId: "rich1", title: "How I Generate PRDs to Build MVPs in a Weekend", url: "https://www.youtube.com/watch?v=rich1", channelHandle: "codewithrich", watchedAt: new Date("2026-11-03T12:00:00Z").getTime(), thumbnail: "thumb1.png" },
+  { videoId: "rich2", title: "The 4 Pillars of AI Development (Most Teams Only Use One)", url: "https://www.youtube.com/watch?v=rich2", channelHandle: "codewithrich", watchedAt: new Date("2026-11-02T12:00:00Z").getTime(), thumbnail: "thumb2.png" },
+  { videoId: "rich3", title: "Manual Workflow Building Is Dead", url: "https://www.youtube.com/watch?v=rich3", channelHandle: "codewithrich", watchedAt: new Date("2026-10-31T12:00:00Z").getTime(), thumbnail: "thumb1.png" },
   { videoId: "other1", title: "Not this channel", url: "https://www.youtube.com/watch?v=other1", channelHandle: "OtherChannel", watchedAt: Date.now(), thumbnail: "thumb1.png" }
 ];
-var filtered = filterByChannel(watches, { handle: "MrMorj" });
+var filtered = filterByChannel(watches, { handle: "codewithrich" });
 var contents = document.getElementById("contents");
 var original = contents.innerHTML;
 var historyActive = false;

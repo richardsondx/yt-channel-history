@@ -33,7 +33,7 @@
   }
 
   function findChipBar() {
-    // Real YouTube markup, from the MrMorj page: a button with
+    // Real YouTube markup, from a channel Videos page: a button with
     // aria-label="Latest" inside a [role="tablist"] chip bar. The tablist,
     // not the first chip's wrapper, is the container to append to.
     // Appending to the wrapper is what put History on a second row.
