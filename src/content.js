@@ -13,7 +13,9 @@
     active: false,
     savedContents: null,
     savedChip: null,
-    lastUrl: window.location.href
+    lastUrl: window.location.href,
+    lastWatches: [],
+    lastChannel: null
   };
 
   function getChannelFromPage() {
@@ -165,18 +167,66 @@
     return document.getElementById("ytch-history-grid");
   }
 
+  function findRenderer() {
+    return document.querySelector("ytd-rich-grid-renderer") || null;
+  }
+
+  function ensureHistoryGrid() {
+    let grid = historyGridEl();
+    if (grid) return grid;
+    grid = document.createElement("div");
+    grid.id = "ytch-history-grid";
+    const renderer = findRenderer();
+    if (renderer && renderer.parentElement) renderer.parentElement.insertBefore(grid, renderer.nextSibling);
+    else {
+      const contents = findContents();
+      if (contents && contents.parentElement) contents.parentElement.insertBefore(grid, contents.nextSibling);
+      else document.body.appendChild(grid);
+    }
+    return grid;
+  }
+
+  function hideOriginalGrid() {
+    const contents = findContents();
+    if (contents) contents.style.display = "none";
+  }
+
+  function showOriginalGrid() {
+    const contents = findContents();
+    if (contents) contents.style.display = "";
+  }
+
   function closeHistory(restoreSelected) {
     if (!state.active && !historyGridEl()) return;
     const grid = historyGridEl();
     if (grid) grid.remove();
-    const contents = findContents();
-    if (contents) contents.style.display = "";
+    showOriginalGrid();
     const btn = document.getElementById("ytch-history-button");
     setChip(btn, false);
     if (restoreSelected) setChip(state.savedChip, true);
     state.active = false;
     state.savedContents = null;
     state.savedChip = null;
+    state.lastWatches = [];
+  }
+
+  function watchdog() {
+    // YouTube can re-render its grid renderer at any time, which
+    // restores the original grid and drops the chip. If History is
+    // supposed to be on, put it back: hide the new original grid,
+    // re-create the History grid outside the renderer if it is gone,
+    // and re-activate the chip. This is the fix for the screenshot
+    // where the chip was black but the grid was the original grid.
+    if (!state.active) return;
+    const contents = findContents();
+    if (contents && contents.style.display !== "none") contents.style.display = "none";
+    let grid = historyGridEl();
+    if (!grid) {
+      grid = ensureHistoryGrid();
+      grid.innerHTML = renderWatchGridHtml(state.lastWatches || []);
+    }
+    const btn = document.getElementById("ytch-history-button");
+    if (btn) setChip(btn, true);
   }
 
   async function openHistory(channel) {
@@ -185,39 +235,43 @@
     // Scan first, while the original grid is still on screen.
     const scanned = scanWatchedFromGrid(channel);
     const gridItemsOnPage = contents.querySelectorAll("ytd-rich-item-renderer, ytd-grid-video-renderer").length;
-    console.log("[YTCH 0.2.0] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
+    console.log("[YTCH 0.2.1] History clicked, channel:", channel, "grid items on page:", gridItemsOnPage, "scanned watched:", scanned.length);
     state.savedChip = sortChipButtons().find(function (b) { return b.getAttribute("aria-selected") === "true"; }) || null;
     state.active = true;
+    state.lastChannel = channel;
     const btn = document.getElementById("ytch-history-button");
     setChip(btn, true);
     sortChipButtons().forEach(function (b) { setChip(b, false); });
-    // Do NOT replace YouTube's managed #contents innerHTML. That is
-    // fragile on a real page, because YouTube can re-render it and
-    // wipe the History grid or the chip. Hide the original grid
-    // instead, and put our History grid next to it, as a sibling.
-    contents.style.display = "none";
-    let historyGrid = historyGridEl();
-    if (!historyGrid) {
-      historyGrid = document.createElement("div");
-      historyGrid.id = "ytch-history-grid";
-      if (contents.parentElement) contents.parentElement.insertBefore(historyGrid, contents.nextSibling);
-      else contents.appendChild(historyGrid);
-    }
+    // History grid lives OUTSIDE YouTube's grid renderer, not inside
+    // its #contents and not as a sibling inside it. YouTube re-renders
+    // that renderer and wipes anything inside it, which is why the
+    // chip could be black while the grid was the original grid.
+    // Hide the original grid, show our grid outside the renderer.
+    hideOriginalGrid();
+    let historyGrid = ensureHistoryGrid();
     historyGrid.innerHTML = '<div class="ytch-grid-loading">Loading watched videos...</div>';
     try {
       const res = await chrome.runtime.sendMessage({ type: "ytch-get-watches", channel: channel });
       const stored = filterByChannel((res && res.watches) || [], channel);
       const watches = mergeWatches(stored, scanned);
-      console.log("[YTCH 0.2.0] stored for channel:", stored.length, "merged:", watches.length);
+      state.lastWatches = watches;
+      console.log("[YTCH 0.2.1] stored for channel:", stored.length, "merged:", watches.length);
       if (scanned.length) {
-        // Save what the grid just proved was watched, so the next
-        // History open finds it even if the grid has not loaded yet.
         chrome.runtime.sendMessage({ type: "ytch-import-watches", watches: scanned }).catch(function () {});
       }
-      if (state.active) historyGrid.innerHTML = renderWatchGridHtml(watches);
+      if (state.active) {
+        historyGrid = ensureHistoryGrid();
+        historyGrid.innerHTML = renderWatchGridHtml(watches);
+        hideOriginalGrid();
+      }
     } catch (e) {
-      console.log("[YTCH 0.2.0] stored load failed, showing scanned only:", e);
-      if (state.active) historyGrid.innerHTML = renderWatchGridHtml(scanned);
+      console.log("[YTCH 0.2.1] stored load failed, showing scanned only:", e);
+      state.lastWatches = scanned;
+      if (state.active) {
+        historyGrid = ensureHistoryGrid();
+        historyGrid.innerHTML = renderWatchGridHtml(scanned);
+        hideOriginalGrid();
+      }
     }
   }
 
@@ -225,17 +279,21 @@
     if (!isChannelVideosPage()) return;
     if (document.getElementById("ytch-history-button")) return;
     // The chip is missing, which means YouTube re-rendered the chip
-    // bar, for example after a Latest, Popular, or Oldest click. That
-    // re-render also replaced the grid, so any History grid is stale.
-    // Remove it and show the original grid again, then re-create the
-    // chip in the new chip bar.
-    const oldGrid = historyGridEl();
-    if (oldGrid) oldGrid.remove();
-    const oldContents = findContents();
-    if (oldContents) oldContents.style.display = "";
-    state.active = false;
-    state.savedContents = null;
-    state.savedChip = null;
+    // bar. If History is supposed to be on, keep it on: do NOT remove
+    // the History grid, re-create the chip and re-activate it, and
+    // hide the original grid again. Only reset when History is off.
+    if (state.active && historyGridEl()) {
+      // Fall through to re-create the chip below, then watchdog
+      // will re-activate it and hide the original grid again.
+    } else {
+      const oldGrid = historyGridEl();
+      if (oldGrid) oldGrid.remove();
+      showOriginalGrid();
+      state.active = false;
+      state.savedContents = null;
+      state.savedChip = null;
+      state.lastWatches = [];
+    }
     const channel = getChannelFromPage();
     const chipBar = findChipBar();
 
@@ -285,6 +343,7 @@
       viewModel.appendChild(shape);
       wrapper.appendChild(viewModel);
       chipBar.appendChild(wrapper);
+      if (state.active) { setChip(button, true); hideOriginalGrid(); }
       return;
     }
 
@@ -367,6 +426,7 @@
         pending = true;
         setTimeout(function () {
           pending = false;
+          if (state.active) watchdog();
           if (isChannelVideosPage() && !document.getElementById("ytch-history-button")) run();
         }, 200);
       });
@@ -375,6 +435,7 @@
     let lastUrl = window.location.href;
     setInterval(function () {
       if (window.location.href !== lastUrl) { lastUrl = window.location.href; setTimeout(run, 500); return; }
+      if (state.active) watchdog();
       if (isChannelVideosPage() && !document.getElementById("ytch-history-button")) run();
     }, 1000);
   }
